@@ -42,3 +42,5 @@ The default local mode produces an extractive, grounded synthesis. To connect an
 ## Project framing for an interview
 
 This is a personal product project, not a client delivery. The interesting discussion is not “I made a chatbot”; it is how to make answers traceable, what happens when retrieval is weak, how versions are handled, and how you would evaluate the system before people rely on it.
+
+For the design questions, trade-offs and next experiments, see the [working paper](docs/working-paper.md).
