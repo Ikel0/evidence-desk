@@ -6,6 +6,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from .evaluation import evaluate, load_cases
 from .rag import answer
 from .store import EvidenceStore
 
@@ -39,6 +40,12 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/documents":
             self.send_json(STORE.list_documents())
+            return
+        if self.path == "/api/evaluation":
+            try:
+                self.send_json(evaluate(STORE, load_cases(ROOT / "eval" / "golden.json")))
+            except (OSError, ValueError) as exc:
+                self.send_json({"error": "Suite d'évaluation indisponible", "detail": str(exc)}, HTTPStatus.SERVICE_UNAVAILABLE)
             return
         super().do_GET()
 

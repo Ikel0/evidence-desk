@@ -8,6 +8,7 @@ Evidence Desk is a local-first, auditable RAG workspace for policy, procedure an
 - deterministic chunking and a SQLite FTS5 search index;
 - hybrid retrieval: lexical search plus token-overlap reranking;
 - grounded answers with inline source references and confidence signals;
+- a visible quality gate that checks retrieval, grounding and citations against reference questions;
 - an optional LLM adapter, while keeping a working no-key local mode;
 - a small evaluation set and automated tests.
 
@@ -24,7 +25,8 @@ Open `http://localhost:8080`. The demo policies are indexed automatically on fir
 
 1. Ask a question such as `Quand faut-il faire valider une demande d'accès ?`.
 2. Inspect the answer's source cards and confidence label.
-3. Drop `.txt`, `.md` or `.html` files into `data/demo/`, then restart the app.
+3. Read the `golden.v1` quality gate before relying on the answer.
+4. Drop `.txt`, `.md` or `.html` files into `data/demo/`, then restart the app.
 
 The application is intentionally local-first. A future production deployment would replace SQLite with Postgres + pgvector/Qdrant, add identity management, asynchronous ingestion and a formal evaluation pipeline.
 
@@ -36,11 +38,12 @@ The default local mode produces an extractive, grounded synthesis. To connect an
 
 - `GET /api/health`
 - `GET /api/documents`
+- `GET /api/evaluation` runs `eval/golden.json` and exposes retrieval, grounding and citation rates
 - `POST /api/query` with `{ "question": "..." }`
 - `POST /api/ingest` with `{ "path": "data/demo/my-file.md" }`
 
 ## Project framing for an interview
 
-This is a personal product project, not a client delivery. The interesting discussion is not “I made a chatbot”; it is how to make answers traceable, what happens when retrieval is weak, how versions are handled, and how you would evaluate the system before people rely on it.
+This is a personal product project, not a client delivery. The interesting discussion is not “I made a chatbot”; it is how to make answers traceable, what happens when retrieval is weak, how versions are handled, and how the retrieval, answer and citation are measured together before people rely on it.
 
 For the design questions, trade-offs and next experiments, see the [working paper](docs/working-paper.md).

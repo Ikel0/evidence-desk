@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -84,8 +85,10 @@ class EvidenceStore:
 
     def search(self, query: str, limit: int = 8) -> list[Evidence]:
         stopwords = {"avec", "dans", "pour", "quel", "quelle", "quels", "quelles", "sont", "être", "fait", "faire", "faut", "qui", "que", "les", "des", "une", "un", "est", "sur", "par", "aux", "ses", "ces"}
-        tokens = [token.strip(".,;:!?()[]{}'\"") for token in query.lower().split()]
-        tokens = [token for token in tokens if len(token) > 2 and token not in stopwords]
+        # FTS5 query syntax treats punctuation as operators. Keep only lexical
+        # terms so a natural French question such as "d'accès" remains safe.
+        tokens = re.findall(r"[a-zà-ÿ0-9]{3,}", query.lower())
+        tokens = [token for token in tokens if token not in stopwords]
         terms = " OR ".join(f"{token}*" if len(token) > 4 else token for token in tokens)
         if not terms:
             return []
