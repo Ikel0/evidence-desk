@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from evidence_desk.evaluation import evaluate
 from evidence_desk.rag import answer
 from evidence_desk.store import EvidenceStore
 
@@ -39,6 +40,18 @@ class RAGTests(unittest.TestCase):
             store.ingest(incident)
             result = answer(store, "Qui valide les accès sensibles ?")
             self.assertIn("responsable métier", result["answer"].lower())
+
+    def test_evaluation_separates_retrieval_from_grounding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            policy = root / "access.md"
+            policy.write_text("Les accès sensibles sont validés par le responsable métier.", encoding="utf-8")
+            store = EvidenceStore(root / "evidence.db")
+            store.ingest(policy)
+            report = evaluate(store, [{"question": "Qui valide les accès sensibles ?", "must_include": "responsable métier"}])
+            self.assertEqual(report["passed"], 1)
+            self.assertEqual(report["retrieval_recall"], 1)
+            self.assertTrue(report["items"][0]["grounded"])
 
 
 if __name__ == "__main__":

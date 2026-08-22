@@ -43,6 +43,14 @@ Le dossier `eval/` contient des questions de référence. Pour chaque question, 
 - que la citation ouvre une trace exploitable ;
 - que le système s’abstient lorsqu’aucune preuve n’est récupérée.
 
+La suite `golden.v1` est exécutable par l'API et affichée dans l'interface. Elle mesure trois choses séparément :
+
+- le passage attendu est présent dans les résultats de recherche ;
+- l'expression attendue est présente dans la réponse rendue ;
+- une citation est retournée avec la réponse.
+
+Ce n'est pas une évaluation exhaustive d'un système RAG. C'est un seuil de non-régression simple et visible. Une réponse peut être bien formulée sans avoir récupéré la bonne preuve ; c'est précisément le type de régression que cette séparation cherche à détecter.
+
 La prochaine itération ajoutera une mesure de recall@k, une annotation humaine des réponses et des scénarios de documents contradictoires.
 
 ## Limites actuelles
