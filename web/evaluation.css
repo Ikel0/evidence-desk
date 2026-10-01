@@ -1,11 +1,35 @@
 .evaluation {
+  margin-top: 56px;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.evaluation summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: 500 11px/1.4 var(--mono);
+}
+
+.evaluation summary::marker {
+  color: var(--terracotta);
+}
+
+.evaluation summary small {
+  color: var(--muted);
+  font: inherit;
+  text-align: right;
+}
+
+.evaluation-content {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 28px;
-  margin-top: 76px;
-  padding: 27px 0 24px;
-  border-top: 2px solid var(--ink);
-  border-bottom: 1px solid var(--line-strong);
+  padding: 14px 0 24px;
+  border-top: 1px solid var(--line);
 }
 
 .evaluation-heading {
@@ -48,36 +72,8 @@
   font: 400 10px/1.35 var(--mono);
 }
 
-.evaluation-details,
 .evaluation-items {
   grid-column: 1 / -1;
-}
-
-.evaluation-details {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  margin-top: 4px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
-.evaluation-details span {
-  padding: 12px 14px 14px;
-  color: var(--muted);
-  font: 500 9px/1.25 var(--mono);
-  letter-spacing: .07em;
-}
-
-.evaluation-details span + span {
-  border-left: 1px solid var(--line);
-}
-
-.evaluation-details b {
-  display: block;
-  margin-top: 7px;
-  color: var(--ink);
-  font: 600 18px/1 var(--sans);
-  letter-spacing: -.04em;
 }
 
 .evaluation-items {
@@ -117,10 +113,9 @@
 }
 
 @media (max-width: 780px) {
-  .evaluation {
+  .evaluation-content {
     grid-template-columns: 1fr;
     gap: 22px;
-    margin-top: 58px;
   }
 
   .evaluation-score {
@@ -128,18 +123,4 @@
     padding: 0 0 0 18px;
   }
 
-  .evaluation-details {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 540px) {
-  .evaluation-details {
-    grid-template-columns: 1fr;
-  }
-
-  .evaluation-details span + span {
-    border-top: 1px solid var(--line);
-    border-left: 0;
-  }
 }

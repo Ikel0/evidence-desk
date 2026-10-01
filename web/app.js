@@ -22,11 +22,6 @@ function create(tagName, className, content) {
   return element;
 }
 
-function percentage(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? `${Math.round(number * 100)}%` : 'non calculé';
-}
-
 function plural(count, singular, pluralForm = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
@@ -45,14 +40,14 @@ function humanize(value) {
   const raw = asText(value, 'non renseigné');
   const labels = {
     active: 'actif',
-    authoritative: 'faisant autorité',
-    controlled: 'contrôlée',
+    authoritative: 'priorité haute',
+    controlled: 'priorité standard',
     draft: 'brouillon',
-    extractive: 'synthèse extractive locale',
-    grounded: 'réponse ancrée',
-    grounded_with_review_warning: 'réponse ancrée, revue à surveiller',
+    extractive: 'passages repris sans génération',
+    grounded: 'passages actifs retrouvés',
+    grounded_with_review_warning: 'passages actifs, revue à vérifier',
     insufficient_evidence: 'preuves insuffisantes',
-    llm_cited: 'synthèse LLM citée',
+    llm_cited: 'texte généré avec références présentes',
     none: 'sans génération',
     reference: 'référence',
     superseded: 'remplacée',
@@ -68,7 +63,7 @@ function setFeedback(message = '', type = '') {
 
 function setBusy(isBusy) {
   askButton.disabled = isBusy;
-  askLabel.textContent = isBusy ? 'Recherche des passages' : 'Consulter les preuves';
+  askLabel.textContent = isBusy ? 'Recherche en cours' : 'Rechercher dans les documents';
   askButton.setAttribute('aria-busy', String(isBusy));
 }
 
@@ -90,8 +85,7 @@ async function refreshStatus() {
   try {
     const data = await fetchJson('/api/health');
     const documents = Number(data.documents ?? data.document_count ?? 0);
-    const mode = asText(data.mode ?? data.runtime ?? 'local-first');
-    status.textContent = `Corpus prêt · ${plural(documents, 'document')} indexé${documents === 1 ? '' : 's'} · ${mode}`;
+    status.textContent = `${plural(documents, 'document')} actif${documents === 1 ? '' : 's'} dans le corpus`;
     status.classList.remove('is-error');
   } catch {
     status.textContent = 'Corpus indisponible pour le moment';
@@ -111,11 +105,6 @@ function renderEvaluationItem(item) {
 async function refreshEvaluation() {
   const score = document.getElementById('eval-score');
   const label = document.getElementById('eval-label');
-  const retrieval = document.getElementById('eval-retrieval');
-  const grounding = document.getElementById('eval-grounding');
-  const citations = document.getElementById('eval-citations');
-  const traceability = document.getElementById('eval-traceability');
-  const abstention = document.getElementById('eval-abstention');
   const items = document.getElementById('eval-items');
 
   try {
@@ -124,21 +113,11 @@ async function refreshEvaluation() {
     const passed = Number(data.passed ?? 0);
     score.textContent = `${passed}/${total}`;
     label.textContent = 'cas de référence validés';
-    retrieval.textContent = percentage(data.retrieval_recall);
-    grounding.textContent = percentage(data.grounded_answer_rate);
-    citations.textContent = percentage(data.citation_rate);
-    traceability.textContent = percentage(data.traceability_rate);
-    abstention.textContent = percentage(data.safe_abstention_rate);
     items.replaceChildren(...(Array.isArray(data.items) ? data.items.map(renderEvaluationItem) : []));
   } catch {
     score.textContent = '...';
     label.textContent = 'Suite indisponible';
-    retrieval.textContent = '...';
-    grounding.textContent = '...';
-    citations.textContent = '...';
-    traceability.textContent = '...';
-    abstention.textContent = '...';
-    items.replaceChildren(create('span', 'eval-item fail', 'Les métriques ne sont pas disponibles.'));
+    items.replaceChildren(create('span', 'eval-item fail', 'Les résultats des cas de référence ne sont pas disponibles.'));
   }
 }
 
@@ -151,13 +130,6 @@ function appendDefinitionList(target, rows) {
   });
 }
 
-function confidenceTone(value, hasSources) {
-  const normalized = asText(value).toLocaleLowerCase('fr-FR');
-  if (!hasSources || /faible|insuffisant|absten/.test(normalized)) return 'is-low';
-  if (/élev|high|fort/.test(normalized)) return 'is-high';
-  return 'is-medium';
-}
-
 function sourceMetadata(source) {
   const record = asRecord(source);
   const rows = [
@@ -166,7 +138,7 @@ function sourceMetadata(source) {
   ];
 
   const authority = record.authority ?? record.source_authority ?? record.owner;
-  if (authority) rows.push(['Autorité', humanize(authority)]);
+  if (authority) rows.push(['Niveau déclaré', humanize(authority)]);
 
   const freshness = record.freshness ?? record.freshness_label;
   if (freshness && typeof freshness === 'object') {
@@ -200,6 +172,10 @@ function renderSource(source, index) {
   const quote = create('blockquote', '', asText(record.excerpt ?? record.text, 'Aucun extrait n’a été transmis pour cette source.'));
   content.append(heading, metadata, quote);
 
+  if (asText(record.excerpt).endsWith('…')) {
+    content.append(create('p', 'source-note', 'Extrait abrégé. Consultez le document source pour le passage complet.'));
+  }
+
   const proof = record.citation ?? record.content_fingerprint ?? record.content_hash ?? record.hash ?? record.chunk_id;
   if (proof) {
     const reference = create('p', 'source-reference', `Référence ${asText(proof)}`);
@@ -216,9 +192,8 @@ function renderSignals(data, sources) {
   const target = document.getElementById('signals');
   const decision = payload.decision ?? payload.outcome ?? payload.state ?? (sources.length ? 'réponse sourcée' : 'preuves insuffisantes');
   appendDefinitionList(target, [
-    ['Passages cités', plural(sources.length, 'passage')],
-    ['Décision', humanize(decision)],
-    ['Mode', humanize(payload.generation ?? retrieval.generation ?? 'extractif local')],
+    ['Passages retournés', plural(sources.length, 'passage')],
+    ['Résultat', humanize(decision)],
   ]);
 }
 
@@ -233,10 +208,10 @@ function renderReceipt(data, sources) {
   const candidateCount = retrieval.candidates ?? receipt.candidates ?? receipt.returned ?? receipt.retrieved_passages ?? sources.length;
 
   appendDefinitionList(document.getElementById('receipt-details'), [
-    ['Stratégie', asText(retrieval.strategy ?? receipt.strategy, 'non déclarée')],
+    ['Méthode', asText(retrieval.strategy ?? receipt.strategy, 'non déclarée')],
     ['Passages', plural(Number(candidateCount) || sources.length, 'retourné', 'retournés')],
     ['Reçu', asText(receiptId, 'non émis')],
-    ['Question', asText(queryFingerprint, 'empreinte non émise')],
+    ['Empreinte de question', asText(queryFingerprint, 'empreinte non émise')],
     ['Empreinte', asText(evidenceHash, 'non émise')],
     ['État', humanize(receipt.state ?? payload.state ?? 'non déclaré')],
     ['Horodatage', formatDate(timestamp)],
@@ -247,12 +222,7 @@ function renderResult(data) {
   const payload = asRecord(data);
   const sources = Array.isArray(payload.sources) ? payload.sources : [];
   const answer = asText(payload.answer, sources.length ? 'Le corpus a retourné des passages à consulter.' : 'Le corpus ne contient pas assez de preuves pour répondre à cette question.');
-  const confidence = document.getElementById('confidence');
-  const confidenceValue = asText(payload.confidence ?? payload.evidence_level, sources.length ? 'à vérifier' : 'insuffisante');
-
   document.getElementById('answer').textContent = answer;
-  confidence.textContent = `Preuve ${confidenceValue}`;
-  confidence.className = `confidence ${confidenceTone(confidenceValue, sources.length)}`;
   renderSignals(payload, sources);
   renderReceipt(payload, sources);
 
@@ -261,7 +231,7 @@ function renderResult(data) {
   sourceRoot.replaceChildren(...sources.map(renderSource));
   sourceSummary.textContent = sources.length
     ? `${plural(sources.length, 'passage')} à comparer avec la réponse`
-    : 'Aucun passage probant retourné. Réponse à ne pas utiliser comme décision.';
+    : 'Aucun passage suffisamment proche. Le corpus ne permet pas de conclure.';
   result.hidden = false;
 
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -287,7 +257,7 @@ async function submitQuestion(event) {
       body: JSON.stringify({ question: value }),
     });
     renderResult(data);
-    setFeedback('Recherche terminée. Vérifiez les passages avant de réutiliser la réponse.', 'is-success');
+    setFeedback('Recherche terminée. Lisez les passages avant de réutiliser la réponse.', 'is-success');
   } catch (error) {
     setFeedback(error instanceof Error ? error.message : 'La recherche a échoué.', 'is-error');
   } finally {

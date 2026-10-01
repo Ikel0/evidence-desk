@@ -7,6 +7,7 @@ import re
 from datetime import date
 from urllib.request import Request, urlopen
 
+from .ingest import fingerprint
 from .store import Evidence, EvidenceStore
 
 
@@ -20,6 +21,21 @@ AUTHORITY_RANK = {"authoritative": 3, "controlled": 2, "reference": 1, "unclassi
 
 def _tokens(value: str) -> set[str]:
     return {token for token in re.findall(r"[a-zà-ÿ0-9]{3,}", value.lower()) if token not in STOPWORDS}
+
+
+def _plain_text(value: str) -> str:
+    """Keep Markdown markers out of excerpts while preserving the source text."""
+    body = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", value)
+    return re.sub(r"\s+", " ", body).strip()
+
+
+def _passage_text(item: Evidence) -> str:
+    """Avoid repeating a document title at the start of an already titled passage."""
+    text = _plain_text(item.text)
+    title = _plain_text(item.document)
+    if title and text.casefold().startswith(title.casefold()):
+        return text[len(title):].lstrip(" :.-")
+    return text
 
 
 def retrieve(store: EvidenceStore, question: str, limit: int = 4) -> list[Evidence]:
@@ -58,7 +74,7 @@ def _best_sentences(evidence: list[Evidence], question: str) -> list[tuple[str, 
     candidates: list[tuple[int, str, Evidence]] = []
     seen: set[str] = set()
     for item in evidence:
-        for sentence in re.split(r"(?<=[.!?])\s+", item.text):
+        for sentence in re.split(r"(?<=[.!?])\s+", _passage_text(item)):
             clean = sentence.strip()
             score = len(tokens & _tokens(clean))
             key = clean.lower()
@@ -135,11 +151,12 @@ def _freshness(review_due_at: str | None) -> dict[str, str]:
         return {"state": "review_overdue", "label": "revue échue"}
     if days <= 30:
         return {"state": "review_soon", "label": "revue proche"}
-    return {"state": "current", "label": "revue à jour"}
+    return {"state": "current", "label": "date de revue future"}
 
 
 def _source_payload(item: Evidence, index: int) -> dict[str, object]:
     freshness = _freshness(item.review_due_at)
+    excerpt = _passage_text(item)
     return {
         "id": f"S{index}",
         "citation": f"{item.source_id}@{item.version}#p{item.position}",
@@ -155,7 +172,7 @@ def _source_payload(item: Evidence, index: int) -> dict[str, object]:
         "content_fingerprint": f"sha256:{item.content_hash[:16]}",
         "chunk_id": item.chunk_id,
         "position": item.position,
-        "excerpt": item.text[:360] + ("…" if len(item.text) > 360 else ""),
+        "excerpt": excerpt[:360] + ("…" if len(excerpt) > 360 else ""),
     }
 
 
@@ -174,29 +191,57 @@ def _retrieval_summary(question: str, evidence: list[Evidence]) -> dict[str, obj
     }
 
 
-def answer(store: EvidenceStore, question: str) -> dict[str, object]:
-    """Return a cited answer or a deliberate refusal when no evidence was found."""
+def _receipt_preview(question: str, evidence: list[Evidence], *, state: str, generation: str, reason: str) -> dict[str, object]:
+    """Describe a test run without writing it into the audit table."""
+    normalized_question = " ".join(question.lower().split())
+    snapshot = [
+        {
+            "source_id": item.source_id,
+            "version": item.version,
+            "chunk_id": item.chunk_id,
+            "position": item.position,
+            "content_hash": item.content_hash,
+        }
+        for item in evidence
+    ]
+    return {
+        "id": "non enregistré",
+        "query_fingerprint": f"sha256:{fingerprint(normalized_question)[:16]}",
+        "evidence_fingerprint": f"sha256:{fingerprint(json.dumps(snapshot, ensure_ascii=False, sort_keys=True))[:16]}",
+        "retrieved_passages": len(evidence),
+        "state": state,
+        "generation": generation,
+        "reason": reason,
+        "recorded_at": None,
+        "preview": True,
+    }
+
+
+def answer(store: EvidenceStore, question: str, *, record_receipt: bool = True) -> dict[str, object]:
+    """Return cited passages or a deliberate refusal when no evidence was found."""
     normalized_question = question.strip()
     evidence = retrieve(store, normalized_question)
     retrieval = _retrieval_summary(normalized_question, evidence)
     if not evidence:
-        receipt = store.record_receipt(
-            normalized_question,
-            [],
-            response_state="insufficient_evidence",
-            generation="none",
-            reason="no_active_passage_retrieved",
+        receipt_args = {
+            "response_state": "insufficient_evidence",
+            "generation": "none",
+            "reason": "no_active_passage_retrieved",
+        }
+        receipt = (
+            store.record_receipt(normalized_question, [], **receipt_args)
+            if record_receipt
+            else _receipt_preview(normalized_question, [], state="insufficient_evidence", generation="none", reason="no_active_passage_retrieved")
         )
         retrieval.update(
             {
-                "safe_to_answer": False,
+                "has_active_passages": False,
                 "reason": "Aucun passage actif ne soutient cette question dans le corpus actuel.",
             }
         )
         return {
             "state": "insufficient_evidence",
             "answer": "Je ne peux pas répondre de façon fiable avec le corpus actuellement indexé. Reformulez la question ou ajoutez une source contrôlée.",
-            "confidence": "insuffisante",
             "sources": [],
             "retrieval": retrieval,
             "generation": "none",
@@ -218,19 +263,21 @@ def answer(store: EvidenceStore, question: str) -> dict[str, object]:
 
     has_review_warning = any(source["freshness"]["state"] == "review_overdue" for source in sources)
     state = "grounded_with_review_warning" if has_review_warning else "grounded"
-    confidence = "modérée" if has_review_warning or len(evidence) < 3 else "élevée"
-    retrieval.update({"safe_to_answer": True, "reason": "Passages actifs récupérés et cités."})
-    receipt = store.record_receipt(
-        normalized_question,
-        evidence,
-        response_state=state,
-        generation=generation,
-        reason=generation_reason,
+    retrieval.update({"has_active_passages": True, "reason": "Passages actifs récupérés et cités."})
+    receipt = (
+        store.record_receipt(
+            normalized_question,
+            evidence,
+            response_state=state,
+            generation=generation,
+            reason=generation_reason,
+        )
+        if record_receipt
+        else _receipt_preview(normalized_question, evidence, state=state, generation=generation, reason=generation_reason)
     )
     return {
         "state": state,
         "answer": f"D’après les passages récupérés : {synthesis}",
-        "confidence": confidence,
         "sources": sources,
         "retrieval": retrieval,
         "generation": generation,
