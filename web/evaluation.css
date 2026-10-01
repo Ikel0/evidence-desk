@@ -1,49 +1,51 @@
-/* A visible release gate keeps the product focused on evidence, not just fluency. */
 .evaluation {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 26px;
-  margin-top: 42px;
-  padding: 28px 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  margin-top: 76px;
+  padding: 27px 0 24px;
   border-top: 2px solid var(--ink);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-strong);
 }
 
-.evaluation > div:first-child > p {
-  margin: 0;
-  color: var(--red);
-  font: 10px 'DM Mono', monospace;
-  letter-spacing: .1em;
+.evaluation-heading {
+  max-width: 700px;
 }
 
 .evaluation h2 {
-  font: 600 clamp(1.45rem, 2.7vw, 2.3rem)/1.12 Manrope, sans-serif;
-  margin: 13px 0 0;
-  letter-spacing: -.05em;
+  margin-top: 13px;
+  font: 400 clamp(2rem, 3.6vw, 3.45rem)/1.08 var(--serif);
+  letter-spacing: -.06em;
 }
 
-.evaluation h2 i {
-  font: 400 italic 1.08em 'Instrument Serif', serif;
-  color: #3f6755;
+.evaluation-intro {
+  max-width: 535px;
+  margin: 21px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.62;
 }
 
 .evaluation-score {
-  text-align: right;
   align-self: end;
+  min-width: 160px;
+  padding: 14px 0 6px 23px;
+  border-left: 1px solid var(--line);
+  text-align: right;
 }
 
 .evaluation-score strong {
   display: block;
-  font: 400 clamp(2.7rem, 5vw, 4.2rem)/.8 'Instrument Serif', serif;
-  letter-spacing: -.08em;
+  color: var(--moss);
+  font: 400 clamp(3.2rem, 6vw, 5rem)/.82 var(--serif);
+  letter-spacing: -.09em;
 }
 
 .evaluation-score span {
   display: block;
-  margin-top: 11px;
+  margin-top: 10px;
   color: var(--muted);
-  font: 9px 'DM Mono', monospace;
-  white-space: nowrap;
+  font: 400 10px/1.35 var(--mono);
 }
 
 .evaluation-details,
@@ -53,74 +55,91 @@
 
 .evaluation-details {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 4px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
 .evaluation-details span {
-  padding: 13px 0;
+  padding: 12px 14px 14px;
   color: var(--muted);
-  font: 9px 'DM Mono', monospace;
-  letter-spacing: .06em;
+  font: 500 9px/1.25 var(--mono);
+  letter-spacing: .07em;
 }
 
 .evaluation-details span + span {
   border-left: 1px solid var(--line);
-  padding-left: 16px;
 }
 
 .evaluation-details b {
   display: block;
-  margin-top: 5px;
+  margin-top: 7px;
   color: var(--ink);
-  font: 700 18px Manrope, sans-serif;
-  letter-spacing: -.05em;
+  font: 600 18px/1 var(--sans);
+  letter-spacing: -.04em;
 }
 
 .evaluation-items {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .eval-item {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  max-width: 100%;
+  padding: 7px 8px;
   border: 1px solid var(--line);
-  padding: 7px 9px;
   color: var(--muted);
-  font: 9px 'DM Mono', monospace;
+  font: 400 9px/1.35 var(--mono);
 }
 
 .eval-item i {
-  width: 7px;
-  height: 7px;
+  display: block;
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--red);
+  background: var(--terracotta);
+}
+
+.eval-item.pass {
+  border-color: #a9bdab;
+  background: var(--moss-light);
+  color: var(--ink-soft);
 }
 
 .eval-item.pass i {
-  background: #3f6755;
+  background: var(--moss);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 780px) {
   .evaluation {
     grid-template-columns: 1fr;
+    gap: 22px;
+    margin-top: 58px;
   }
 
   .evaluation-score {
-    text-align: left;
+    width: fit-content;
+    padding: 0 0 0 18px;
   }
 
+  .evaluation-details {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 540px) {
   .evaluation-details {
     grid-template-columns: 1fr;
   }
 
   .evaluation-details span + span {
-    border-left: 0;
     border-top: 1px solid var(--line);
-    padding-left: 0;
+    border-left: 0;
   }
 }

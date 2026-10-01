@@ -1,7 +1,7 @@
 [project]
 name = "evidence-desk"
-version = "0.1.0"
-description = "An auditable, local-first RAG workspace for policy and procedure documents."
+version = "0.2.0"
+description = "A local-first RAG workspace with source provenance, safe abstention and retrieval receipts."
 requires-python = ">=3.11"
 
 [project.scripts]

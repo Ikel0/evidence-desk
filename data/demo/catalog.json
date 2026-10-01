@@ -1,0 +1,32 @@
+{
+  "access_policy.md": {
+    "source_id": "POL-ACCESS-001",
+    "title": "Politique de gestion des accès",
+    "version": "2.3",
+    "authority": "controlled",
+    "status": "active",
+    "owner": "Data Governance",
+    "reviewed_at": "2026-09-01",
+    "review_due_at": "2027-03-01"
+  },
+  "data_quality_standard.md": {
+    "source_id": "STD-DQ-004",
+    "title": "Standard de qualité des données",
+    "version": "1.8",
+    "authority": "controlled",
+    "status": "active",
+    "owner": "Data Reliability",
+    "reviewed_at": "2026-08-15",
+    "review_due_at": "2027-01-15"
+  },
+  "incident_response.md": {
+    "source_id": "RUN-INC-002",
+    "title": "Procédure de réponse aux incidents data",
+    "version": "3.1",
+    "authority": "controlled",
+    "status": "active",
+    "owner": "Service Reliability",
+    "reviewed_at": "2026-09-10",
+    "review_due_at": "2026-12-01"
+  }
+}

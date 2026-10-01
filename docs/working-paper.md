@@ -1,70 +1,109 @@
-# Evidence Desk: fiche de travail
+# Evidence Desk : fiche de travail
 
-## Pourquoi ce projet
+## Problème étudié
 
-Dans beaucoup d’équipes, les règles de sécurité, les procédures et les décisions passées existent déjà. Le problème est qu’elles sont dispersées dans des documents et qu’il devient difficile de retrouver la bonne version au bon moment. Un assistant qui répond sans montrer ses preuves ajoute un nouveau risque au lieu d’en enlever un.
+Dans une équipe, les règles de sécurité, les standards data et les procédures d'incident existent souvent déjà. Le problème n'est pas seulement de les retrouver. Il faut aussi savoir si le passage consulté est actif, quelle version il représente, qui en est responsable et si sa revue est encore à jour.
 
-Evidence Desk est mon terrain d’expérimentation pour une idée simple: une réponse documentaire doit être vérifiable par la personne qui la lit.
+Une réponse fluide sans ces éléments peut sembler utile tout en étant dangereuse. Evidence Desk explore donc un RAG où la preuve est un objet de premier plan, et non une annexe ajoutée après la génération.
 
-## Questions de travail
+## Question de travail
 
-1. Comment retrouver un passage utile sans dépendre immédiatement d’un modèle externe ?
-2. Comment rendre la source, sa version et son extrait visibles dans l’interface ?
-3. Que doit faire le système lorsque les preuves disponibles sont trop faibles ?
-4. Comment évaluer le produit autrement qu’avec une impression de fluidité ?
+Comment proposer une réponse documentaire qui reste utile quand le retrieval est bon, mais qui devient prudente lorsque les preuves sont faibles, remplacées ou difficiles à inspecter ?
 
-## Première architecture
+## Hypothèses
+
+1. Pour un corpus court et structuré, un retrieval lexical instrumenté peut être une base lisible avant d'introduire un modèle vectoriel.
+2. Une citation utile doit désigner un passage, une source stable, une version et une empreinte de contenu.
+3. L'abstention est une fonctionnalité du produit, pas un échec de l'interface.
+4. Un score global est insuffisant. Il faut distinguer retrieval, ancrage, citations, traçabilité et refus sûr.
+
+## Architecture actuelle
 
 ```text
-Documents locaux
+Document local + catalogue de source
     -> lecture et normalisation
-    -> hash de contenu et version
+    -> hash de contenu + identifiant/version métier
     -> chunking avec recouvrement
     -> SQLite FTS5
-    -> recherche lexicale et reranking
-    -> réponse extractive ou LLM optionnel
-    -> sources, extraits et niveau de confiance
+    -> filtre des sources actives
+    -> reranking lexical
+    -> réponse extractive citée ou LLM validé
+    -> reçu de récupération sans question en clair
 ```
 
-Le choix de SQLite et FTS5 est volontaire. Il rend le chemin d’exécution lisible, permet de travailler sans clé API et évite de masquer les questions de retrieval derrière un modèle. Pour une version équipe, je remplacerais cette base locale par Postgres avec pgvector ou un moteur vectoriel, et j’ajouterais une ingestion asynchrone ainsi qu’une gestion des droits.
+Le catalogue est distinct du contenu. Il porte `source_id`, `version`, `authority`, `status`, `owner`, `reviewed_at` et `review_due_at`. Cette séparation évite de confondre le hash technique d'un fichier avec une version validée par un propriétaire de document.
 
-## Hypothèses à vérifier
+## Contrat de réponse
 
-- Pour un corpus documentaire court et structuré, une recherche lexicale bien instrumentée peut déjà donner des résultats utiles.
-- La citation du passage source rend une réponse plus contestable, donc plus fiable dans un contexte de travail.
-- Un score de confiance ne vaut que s’il est lié à des signaux observables: nombre de sources, recouvrement de la question, fraîcheur et statut documentaire.
+Une réponse est considérée exploitable seulement si les conditions suivantes sont réunies :
 
-## Protocole d’évaluation
+| Signal | Règle actuelle | Effet visible |
+| --- | --- | --- |
+| Source active | Les sources `draft` et `superseded` sont exclues | Elles ne peuvent pas justifier une réponse |
+| Priorité documentaire | À pertinence égale, `authoritative` puis `controlled` passent avant une simple référence | Le système rend visible la hiérarchie déclarée des sources |
+| Passage traçable | Chaque source possède une citation `id@version#passage` | La personne qui lit sait quoi vérifier |
+| Fraîcheur | La date de revue est comparée à la date courante | Un passage peut être utilisé avec un avertissement de revue |
+| Génération | Le LLM optionnel doit citer chaque phrase factuelle | Sinon retour à une synthèse extractive locale |
+| Preuves absentes | Aucun passage actif récupéré | Refus explicite, aucune réponse inventée |
 
-Le dossier `eval/` contient des questions de référence. Pour chaque question, je vérifie au minimum:
+Le système ne transforme pas une source dont la revue est échue en vérité inutilisable. Il le signale car l'évaluation métier reste une décision humaine. En revanche, une source remplacée ou en brouillon est retirée du chemin de réponse.
 
-- que la réponse ne contredit pas la procédure ;
-- que le passage attendu est retrouvé ;
-- que la citation ouvre une trace exploitable ;
-- que le système s’abstient lorsqu’aucune preuve n’est récupérée.
+Quand une nouvelle version `active` d'un même `source_id` est ingérée, les versions actives antérieures deviennent `superseded`. Ce mécanisme ne résout pas les contradictions métier, mais empêche le cas plus banal où deux versions d'une même règle sont servies ensemble sans avertissement.
 
-La suite `golden.v1` est exécutable par l'API et affichée dans l'interface. Elle mesure trois choses séparément :
+## Reçu de récupération
 
-- le passage attendu est présent dans les résultats de recherche ;
-- l'expression attendue est présente dans la réponse rendue ;
-- une citation est retournée avec la réponse.
+Chaque interrogation génère un reçu, par exemple `EDR-000042`. Il contient :
 
-Ce n'est pas une évaluation exhaustive d'un système RAG. C'est un seuil de non-régression simple et visible. Une réponse peut être bien formulée sans avoir récupéré la bonne preuve ; c'est précisément le type de régression que cette séparation cherche à détecter.
+- l'empreinte SHA-256 de la question normalisée ;
+- la liste des passages récupérés avec leur source, version, position et hash de contenu ;
+- l'empreinte de cet ensemble de preuves ;
+- l'état rendu, le mode de génération et le motif de repli éventuel ;
+- l'horodatage de l'opération.
 
-La prochaine itération ajoutera une mesure de recall@k, une annotation humaine des réponses et des scénarios de documents contradictoires.
+Le reçu ne stocke pas la question ni la réponse en clair. Le but est de pouvoir comparer une décision de retrieval tout en réduisant le risque de créer un historique non maîtrisé de contenu potentiellement sensible.
 
-## Limites actuelles
+## Évaluation `golden.v2`
 
-- Les documents de démonstration sont petits et textuels.
-- Le reranking est lexical et non sémantique.
-- Le niveau de confiance est heuristique.
-- Il n’y a pas encore de gestion des utilisateurs, des permissions ni d’historique de conversation.
+Le jeu de référence contient trois questions appuyées par le corpus de démonstration et un cas où le système doit s'abstenir. Pour chaque question, le projet mesure séparément :
 
-Ces limites font partie du projet. Elles donnent un point de départ précis pour discuter de la suite plutôt que de faire croire qu’un prototype résout déjà tous les problèmes d’un RAG d’entreprise.
+- rappel du passage attendu ;
+- présence de l'élément attendu dans la réponse ;
+- présence de citations ;
+- correspondance avec la source attendue ;
+- traçabilité de la citation, de la version et du hash ;
+- succès de l'abstention sûre pour les questions hors corpus.
 
-## Suite envisagée
+Ce jeu ne démontre pas une qualité universelle. C'est un seuil de non-régression reproductible. Les résultats ne doivent pas être interprétés comme une mesure de performance sur des documents réels, ni comme une validation de conformité.
 
-1. Ajouter un extracteur PDF avec conservation du numéro de page.
-2. Comparer retrieval lexical, hybride et vectoriel sur le même jeu de questions.
-3. Ajouter une interface d’annotation pour valider ou contester une réponse.
-4. Introduire des permissions documentaires et une piste d’audit de consultation.
+## Décisions prises
+
+### Pourquoi une réponse extractive par défaut ?
+
+Elle rend le comportement testable sans clé API, sans dépendance à un fournisseur externe et sans masquer la qualité du retrieval. Un fournisseur compatible peut être configuré, mais son texte est accepté seulement si les citations `[S1]`, `[S2]` correspondent aux passages transmis.
+
+### Pourquoi ne pas enregistrer les requêtes en clair ?
+
+Une question peut contenir un nom, un incident ou une information interne. Pour le prototype, l'audit porte donc sur les empreintes et les preuves. En environnement équipe, la stratégie de journalisation devrait être définie avec les équipes sécurité, légales et métier.
+
+### Pourquoi SQLite FTS5 ?
+
+Parce qu'il garde le système totalement local et observable. Ce n'est pas le choix final pour un corpus large ou multi-utilisateur. Une suite réaliste demanderait Postgres et pgvector ou un moteur vectoriel, un pipeline d'ingestion asynchrone, des sauvegardes, une supervision et des règles d'accès.
+
+## Limites connues
+
+- Le catalogue des documents de démonstration est manuel.
+- Le reranking est lexical et ne comprend pas les paraphrases complexes.
+- Le signal de fraîcheur dépend d'une date renseignée par le propriétaire.
+- Les citations valident la provenance, pas la vérité métier du contenu.
+- Il n'y a pas encore d'authentification, de permissions documentaires, de chiffrement applicatif ni d'annotation humaine.
+- Le reçu est une piste de démonstration locale, pas une solution de conservation réglementaire.
+
+## Prochaines expériences
+
+1. Ajouter des tests de documents contradictoires et vérifier la présentation du conflit.
+2. Comparer FTS5, retrieval hybride et vectoriel sur le même jeu annoté.
+3. Ajouter un écran de revue où une personne peut confirmer, corriger ou rejeter une réponse.
+4. Associer les sources à des droits d'accès et filtrer le retrieval avant la génération.
+5. Définir une politique de rétention et une exportation de reçus vérifiables.
+
+Le projet reste volontairement honnête sur ce qui est implémenté. Sa valeur est de rendre visibles les décisions et les compromis nécessaires avant d'appeler un prototype un système RAG fiable.
