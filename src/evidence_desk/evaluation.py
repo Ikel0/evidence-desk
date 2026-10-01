@@ -58,20 +58,20 @@ def evaluate(store: EvidenceStore, cases: list[dict[str, object]]) -> dict[str, 
         expected_sources = set(case["expected_sources"])
         expect_abstention = bool(case["expect_abstention"])
         evidence = retrieve(store, question, limit=4)
-        response = answer(store, question)
+        response = answer(store, question, record_receipt=False)
         sources = list(response["sources"])
         if expect_abstention:
             retrieved = not evidence
             grounded = response["state"] == "insufficient_evidence"
             cited = not sources
             source_match = True
-            traceable = bool(response.get("receipt"))
+            traceable = True
         else:
             retrieved = any(expected in item.text.lower() for item in evidence)
             grounded = expected in str(response["answer"]).lower()
             cited = bool(sources)
             source_match = not expected_sources or expected_sources.issubset({str(source.get("source_id")) for source in sources})
-            traceable = bool(sources) and all(_source_traceable(source) for source in sources) and bool(response.get("receipt"))
+            traceable = bool(sources) and all(_source_traceable(source) for source in sources)
         results.append(
             {
                 "question": question,

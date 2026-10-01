@@ -144,7 +144,7 @@ class RAGTests(unittest.TestCase):
             question = "Quel protocole protège les clés cryptographiques ?"
             result = answer(store, question)
             self.assertEqual(result["state"], "insufficient_evidence")
-            self.assertFalse(result["retrieval"]["safe_to_answer"])
+            self.assertFalse(result["retrieval"]["has_active_passages"])
             receipt = store.list_receipts()[0]
             self.assertEqual(receipt["id"], result["receipt"]["id"])
             self.assertNotIn(question, json.dumps(receipt, ensure_ascii=False))
@@ -179,6 +179,7 @@ class RAGTests(unittest.TestCase):
             self.assertEqual(report["retrieval_recall"], 1)
             self.assertEqual(report["safe_abstention_rate"], 1)
             self.assertTrue(report["items"][0]["traceable"])
+            self.assertEqual(store.list_receipts(), [])
 
 
 if __name__ == "__main__":

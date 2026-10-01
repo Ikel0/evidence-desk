@@ -1,21 +1,21 @@
 # Evidence Desk
 
-Evidence Desk est un espace RAG local et auditable pour interroger des politiques, procédures et standards. Le projet part d'une règle simple : une réponse documentaire utile doit permettre de remonter au passage exact, à sa version et à son statut.
+Evidence Desk est une petite démo de recherche documentaire locale. Le corpus contient trois procédures fictives : accès, qualité de données et gestion d’incident. Une question ne reçoit une réponse que si un passage actif peut l’étayer.
 
 Il s'agit d'un projet personnel de démonstration. Les documents livrés sont fictifs et servent à rendre les mécanismes testables. Ce n'est ni une base de connaissances client ni un service de conformité en production.
 
-## Ce que le projet montre
+## Scénario et choix
 
-- ingestion locale avec détection de doublon par hash de contenu ;
-- catalogue de sources avec identifiant stable, version, propriétaire, autorité, statut et date de revue ;
-- recherche SQLite FTS5 suivie d'un reranking lexical explicite ;
+- recherche SQLite FTS5 suivie d’un reranking lexical explicite ;
+- catalogue de sources avec identifiant stable, version, propriétaire, niveau déclaré, statut et date de revue ;
 - exclusion des sources `draft` ou `superseded` de la recherche ;
-- préférence explicite pour une source `authoritative` ou `controlled` lorsque la pertinence textuelle est équivalente ;
-- réponse extractive citée par défaut, sans clé ni appel externe ;
-- mode LLM optionnel, accepté seulement si chaque phrase rendue porte une citation valide ;
+- préférence déclarée pour une source `authoritative` ou `controlled` lorsque la pertinence textuelle est équivalente ;
+- réponse extractive citée par défaut, sans appel externe ;
 - abstention explicite quand aucun passage actif ne soutient la question ;
-- reçu de récupération qui conserve les empreintes de la question et des passages, sans stocker la question en clair ;
-- suite `golden.v2` qui mesure retrieval, ancrage, citations, traçabilité et abstention sûre.
+- reçu local qui conserve les empreintes de la question et des passages, sans écrire la question en clair ;
+- quatre cas de référence : trois réponses attendues et une abstention attendue.
+
+Un fournisseur de texte peut être configuré en développement. Son résultat n’est retenu que si chaque phrase contient une référence syntaxiquement valide. Cette vérification ne prouve pas que la phrase est vraie, donc la réponse extractive reste le chemin par défaut.
 
 ## Démarrer
 
@@ -42,18 +42,18 @@ Quel est le protocole de rotation des clés cryptographiques ?
 
 Le corpus fourni ne contient pas cette règle. Une bonne réponse est donc un refus clair, pas une invention.
 
-## Lire une réponse
+## Ce que l’on peut inspecter
 
 Chaque source retournée contient :
 
 - une citation stable de la forme `SOURCE_ID@VERSION#pPOSITION` ;
 - l'extrait exact utilisé ;
 - une empreinte courte du contenu ;
-- le propriétaire, l'autorité, le statut et le signal de fraîcheur de la source.
+- le propriétaire, le niveau déclaré, le statut et le signal de fraîcheur de la source.
 
-Chaque requête crée aussi un reçu tel que `EDR-000042`. Il associe l'empreinte normalisée de la question, la liste des passages récupérés et une empreinte de preuve. La question et la réponse en clair ne sont pas écrites dans le reçu, afin de ne pas transformer un mécanisme d'audit en journal de contenu sensible.
+Chaque requête crée aussi un reçu tel que `EDR-000042`. Il associe l’empreinte normalisée de la question, la liste des passages récupérés et une empreinte de preuve. La question et la réponse en clair ne sont pas écrites dans le reçu, ce qui réduit l’exposition du texte mais ne constitue pas une garantie de confidentialité à lui seul.
 
-## Ajouter une source contrôlée
+## Ajouter une source en développement local
 
 Déposer un fichier `.md`, `.txt` ou `.html` dans `data/`, puis appeler l'API avec ses métadonnées :
 
@@ -78,14 +78,14 @@ Lorsqu'une nouvelle version active arrive avec le même `source_id`, Evidence De
 
 Le catalogue de démonstration est dans [`data/demo/catalog.json`](data/demo/catalog.json). Il sépare volontairement les métadonnées de gouvernance du texte des documents.
 
-## API
+## API de démonstration
 
 - `GET /api/health`
 - `GET /api/documents`
 - `GET /api/receipts?limit=20`
 - `GET /api/evaluation`
 - `POST /api/query` avec `{ "question": "..." }`
-- `POST /api/ingest` avec le chemin d'un fichier sous `data/` et des métadonnées optionnelles
+- `POST /api/ingest` avec le chemin d’un fichier déjà présent sous `data/` et des métadonnées optionnelles. Cet endpoint sert au développement local ; il ne reçoit pas de fichier uploadé et ne doit pas être exposé tel quel.
 
 ## Vérifier le projet
 
@@ -97,6 +97,6 @@ Les tests couvrent notamment l'idempotence de l'ingestion, la provenance au nive
 
 ## Choix et limites
 
-SQLite FTS5 est volontaire : le chemin documents, passages, récupération, réponse et preuve reste facile à inspecter. Ce projet ne prétend pas remplacer un RAG d'entreprise complet. Il ne possède pas encore de gestion d'identité, de droits documentaires, d'ingestion asynchrone, de stockage vectoriel, de chiffrement applicatif ni de revue humaine intégrée.
+SQLite FTS5 est volontaire : le chemin documents, passages, recherche, réponse et preuve reste facile à inspecter. Ce projet ne prétend pas remplacer un système documentaire d’équipe. Il ne possède pas encore de gestion d’identité, de droits documentaires, d’ingestion asynchrone, de stockage vectoriel, de chiffrement applicatif ni de revue humaine intégrée.
 
 Une version équipe demanderait au minimum une authentification, un contrôle d'accès par document, un pipeline d'ingestion isolé, une stratégie de rétention des reçus, des évaluations annotées par des personnes et une observabilité centralisée. La fiche de travail décrit ces arbitrages et les prochaines expériences dans [`docs/working-paper.md`](docs/working-paper.md).
