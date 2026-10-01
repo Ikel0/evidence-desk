@@ -1,5 +1,21 @@
 [
-  {"question":"Qui valide un accès à une donnée sensible ?", "must_include":"responsable métier"},
-  {"question":"Quel contrôle bloque un indicateur critique ?", "must_include":"bloque la publication"},
-  {"question":"Quand prévenir le responsable lors d'un incident élevé ?", "must_include":"trente minutes"}
+  {
+    "question": "Qui valide un accès à une donnée sensible ?",
+    "must_include": "responsable métier",
+    "expected_sources": ["POL-ACCESS-001"]
+  },
+  {
+    "question": "Quel contrôle bloque un indicateur critique ?",
+    "must_include": "bloque la publication",
+    "expected_sources": ["STD-DQ-004"]
+  },
+  {
+    "question": "Quand prévenir le responsable lors d'un incident élevé ?",
+    "must_include": "trente minutes",
+    "expected_sources": ["RUN-INC-002"]
+  },
+  {
+    "question": "Quel est le protocole de rotation des clés cryptographiques ?",
+    "expect_abstention": true
+  }
 ]

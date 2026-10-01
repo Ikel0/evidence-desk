@@ -5,6 +5,7 @@ import os
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from .evaluation import evaluate, load_cases
 from .rag import answer
@@ -16,10 +17,22 @@ WEB = ROOT / "web"
 STORE = EvidenceStore(DATA / "evidence.db")
 
 
+def load_demo_catalog() -> dict[str, dict[str, object]]:
+    """Load explicit source ownership for the bundled demonstration corpus."""
+    catalog_path = DATA / "demo" / "catalog.json"
+    if not catalog_path.exists():
+        return {}
+    raw = json.loads(catalog_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or not all(isinstance(key, str) and isinstance(value, dict) for key, value in raw.items()):
+        raise ValueError("data/demo/catalog.json must map file names to metadata objects")
+    return raw
+
+
 def seed_demo() -> None:
+    catalog = load_demo_catalog()
     for path in sorted((DATA / "demo").glob("*")):
         if path.suffix.lower() in {".txt", ".md", ".html", ".htm"}:
-            STORE.ingest(path)
+            STORE.ingest(path, metadata=catalog.get(path.name))
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -35,13 +48,23 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:
-        if self.path == "/api/health":
-            self.send_json({"status": "ok", "documents": len(STORE.list_documents())})
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/health":
+            self.send_json({"status": "ok", "documents": len(STORE.list_documents()), "receipts": len(STORE.list_receipts())})
             return
-        if self.path == "/api/documents":
+        if parsed.path == "/api/documents":
             self.send_json(STORE.list_documents())
             return
-        if self.path == "/api/evaluation":
+        if parsed.path == "/api/receipts":
+            requested_limit = parse_qs(parsed.query).get("limit", ["20"])[0]
+            try:
+                limit = int(requested_limit)
+            except ValueError:
+                self.send_json({"error": "La limite doit être un entier"}, HTTPStatus.BAD_REQUEST)
+                return
+            self.send_json(STORE.list_receipts(limit))
+            return
+        if parsed.path == "/api/evaluation":
             try:
                 self.send_json(evaluate(STORE, load_cases(ROOT / "eval" / "golden.json")))
             except (OSError, ValueError) as exc:
@@ -50,25 +73,45 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
-        length = int(self.headers.get("Content-Length", "0"))
         try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > 1_000_000:
+                raise ValueError("La requête est trop volumineuse")
             payload = json.loads(self.rfile.read(length) or b"{}")
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError):
             self.send_json({"error": "JSON invalide"}, HTTPStatus.BAD_REQUEST)
             return
-        if self.path == "/api/query":
-            question = str(payload.get("question", "")).strip()
+        if not isinstance(payload, dict):
+            self.send_json({"error": "Le JSON doit être un objet"}, HTTPStatus.BAD_REQUEST)
+            return
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/query":
+            raw_question = payload.get("question", "")
+            if not isinstance(raw_question, str):
+                self.send_json({"error": "La question doit être du texte"}, HTTPStatus.BAD_REQUEST)
+                return
+            question = raw_question.strip()
             if not question:
                 self.send_json({"error": "Une question est requise"}, HTTPStatus.BAD_REQUEST)
                 return
+            if len(question) > 2000:
+                self.send_json({"error": "La question est trop longue"}, HTTPStatus.BAD_REQUEST)
+                return
             self.send_json(answer(STORE, question))
             return
-        if self.path == "/api/ingest":
+        if parsed.path == "/api/ingest":
             candidate = (ROOT / str(payload.get("path", ""))).resolve()
-            if DATA not in candidate.parents or not candidate.exists():
+            if DATA not in candidate.parents or not candidate.is_file():
                 self.send_json({"error": "Le fichier doit se trouver dans data/"}, HTTPStatus.BAD_REQUEST)
                 return
-            self.send_json(STORE.ingest(candidate))
+            metadata = payload.get("metadata")
+            if metadata is not None and not isinstance(metadata, dict):
+                self.send_json({"error": "Les métadonnées doivent être un objet JSON"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self.send_json(STORE.ingest(candidate, metadata=metadata))
+            except ValueError as exc:
+                self.send_json({"error": "Métadonnées invalides", "detail": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
         self.send_json({"error": "Route inconnue"}, HTTPStatus.NOT_FOUND)
 
