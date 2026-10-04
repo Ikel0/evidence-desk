@@ -282,6 +282,11 @@ async function submitQuestion(event) {
 
 form.addEventListener('submit', submitQuestion);
 
+const platform = navigator.userAgentData?.platform ?? navigator.platform ?? '';
+if (/mac|iphone|ipad/i.test(platform)) {
+  document.getElementById('shortcut-modifier').textContent = '⌘';
+}
+
 question.addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') form.requestSubmit();
 });

@@ -245,12 +245,12 @@ h3 {
 kbd {
   display: inline-block;
   min-width: 20px;
-  margin-right: 3px;
   padding: 1px 4px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   color: var(--ink);
-  font: 400 12px var(--mono);
+  /* Plex Mono dessine un ⌘ minuscule, illisible à 12 px ; la police système a le bon glyphe. */
+  font: 500 12px/1.4 "Figtree", -apple-system, system-ui, sans-serif;
   text-align: center;
 }
 
