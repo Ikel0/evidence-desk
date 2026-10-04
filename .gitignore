@@ -1,3 +1,4 @@
 __pycache__/
 *.pyc
 data/evidence.db
+.DS_Store
