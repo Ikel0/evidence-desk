@@ -2,7 +2,7 @@
 
 Evidence Desk est une petite démo de recherche documentaire locale. Le corpus contient trois procédures fictives : accès, qualité de données et gestion d’incident. Une question ne reçoit une réponse que si un passage actif peut l’étayer.
 
-Il s'agit d'un projet personnel de démonstration. Les documents livrés sont fictifs et servent à rendre les mécanismes testables. Ce n'est ni une base de connaissances client ni un service de conformité en production.
+Il s’agit d’un projet personnel de démonstration. Les documents livrés sont fictifs et servent à rendre les mécanismes testables. Ce n’est ni une base de connaissances client ni un service de conformité en production.
 
 ## Scénario et choix
 
@@ -29,9 +29,9 @@ Ouvrir ensuite `http://localhost:8080`. Au démarrage, les documents de démonst
 Questions de démonstration :
 
 ```text
-Quand faut-il faire valider une demande d'accès ?
+Quand faut-il faire valider une demande d’accès ?
 Quel contrôle bloque un indicateur critique ?
-Quand prévenir le responsable lors d'un incident élevé ?
+Quand prévenir le responsable lors d’un incident élevé ?
 ```
 
 Pour observer le refus, demander par exemple :
@@ -42,12 +42,16 @@ Quel est le protocole de rotation des clés cryptographiques ?
 
 Le corpus fourni ne contient pas cette règle. Une bonne réponse est donc un refus clair, pas une invention.
 
+Dans l’interface, cette question ne retourne aucun passage : le résultat est « preuves insuffisantes » et le reçu ne garde que les empreintes de la question et des passages.
+
+![Evidence Desk refuse de répondre à la question sur la rotation des clés cryptographiques](docs/demo.png)
+
 ## Ce que l’on peut inspecter
 
 Chaque source retournée contient :
 
 - une citation stable de la forme `SOURCE_ID@VERSION#pPOSITION` ;
-- l'extrait exact utilisé ;
+- l’extrait exact utilisé ;
 - une empreinte courte du contenu ;
 - le propriétaire, le niveau déclaré, le statut et le signal de fraîcheur de la source.
 
@@ -55,7 +59,7 @@ Chaque requête crée aussi un reçu tel que `EDR-000042`. Il associe l’emprei
 
 ## Ajouter une source en développement local
 
-Déposer un fichier `.md`, `.txt` ou `.html` dans `data/`, puis appeler l'API avec ses métadonnées :
+Déposer un fichier `.md`, `.txt` ou `.html` dans `data/`, puis appeler l’API avec ses métadonnées :
 
 ```json
 {
@@ -72,9 +76,9 @@ Déposer un fichier `.md`, `.txt` ou `.html` dans `data/`, puis appeler l'API av
 }
 ```
 
-Les valeurs d'autorité admises sont `authoritative`, `controlled`, `reference` et `unclassified`. Les statuts admis sont `active`, `draft` et `superseded`. Seules les sources actives peuvent appuyer une réponse.
+Les valeurs d’autorité admises sont `authoritative`, `controlled`, `reference` et `unclassified`. Les statuts admis sont `active`, `draft` et `superseded`. Seules les sources actives peuvent appuyer une réponse.
 
-Lorsqu'une nouvelle version active arrive avec le même `source_id`, Evidence Desk passe les versions actives précédentes à `superseded`. Le corpus ne mélange donc pas silencieusement une procédure remplacée avec sa version courante.
+Lorsqu’une nouvelle version active arrive avec le même `source_id`, Evidence Desk passe les versions actives précédentes à `superseded`. Le corpus ne mélange donc pas silencieusement une procédure remplacée avec sa version courante.
 
 Le catalogue de démonstration est dans [`data/demo/catalog.json`](data/demo/catalog.json). Il sépare volontairement les métadonnées de gouvernance du texte des documents.
 
@@ -93,10 +97,10 @@ Le catalogue de démonstration est dans [`data/demo/catalog.json`](data/demo/cat
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-Les tests couvrent notamment l'idempotence de l'ingestion, la provenance au niveau du passage, la mise à l'écart d'une source remplacée, l'abstention sûre et la traçabilité des cas de référence.
+Les tests couvrent notamment l’idempotence de l’ingestion, la provenance au niveau du passage, la mise à l’écart d’une source remplacée, l’abstention sûre et la traçabilité des cas de référence.
 
 ## Choix et limites
 
 SQLite FTS5 est volontaire : le chemin documents, passages, recherche, réponse et preuve reste facile à inspecter. Ce projet ne prétend pas remplacer un système documentaire d’équipe. Il ne possède pas encore de gestion d’identité, de droits documentaires, d’ingestion asynchrone, de stockage vectoriel, de chiffrement applicatif ni de revue humaine intégrée.
 
-Une version équipe demanderait au minimum une authentification, un contrôle d'accès par document, un pipeline d'ingestion isolé, une stratégie de rétention des reçus, des évaluations annotées par des personnes et une observabilité centralisée. La fiche de travail décrit ces arbitrages et les prochaines expériences dans [`docs/working-paper.md`](docs/working-paper.md).
+Une version équipe demanderait au minimum une authentification, un contrôle d’accès par document, un pipeline d’ingestion isolé, une stratégie de rétention des reçus, des évaluations annotées par des personnes et une observabilité centralisée. La fiche de travail décrit ces arbitrages et les prochaines expériences dans [`docs/working-paper.md`](docs/working-paper.md).
