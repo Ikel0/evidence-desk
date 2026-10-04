@@ -23,7 +23,8 @@ function create(tagName, className, content) {
 }
 
 function plural(count, singular, pluralForm = `${singular}s`) {
-  return `${count} ${count === 1 ? singular : pluralForm}`;
+  // En français, 0 et 1 prennent le singulier.
+  return `${count} ${count <= 1 ? singular : pluralForm}`;
 }
 
 function formatDate(value) {
@@ -85,7 +86,7 @@ async function refreshStatus() {
   try {
     const data = await fetchJson('/api/health');
     const documents = Number(data.documents ?? data.document_count ?? 0);
-    status.textContent = `${plural(documents, 'document')} actif${documents === 1 ? '' : 's'} dans le corpus`;
+    status.textContent = `${plural(documents, 'document')} actif${documents <= 1 ? '' : 's'} dans le corpus`;
     status.classList.remove('is-error');
   } catch {
     status.textContent = 'Corpus indisponible pour le moment';
@@ -106,6 +107,8 @@ async function refreshEvaluation() {
   const score = document.getElementById('eval-score');
   const label = document.getElementById('eval-label');
   const items = document.getElementById('eval-items');
+  const title = document.getElementById('evaluation-title');
+  const summary = document.getElementById('eval-summary');
 
   try {
     const data = await fetchJson('/api/evaluation');
@@ -113,10 +116,13 @@ async function refreshEvaluation() {
     const passed = Number(data.passed ?? 0);
     score.textContent = `${passed}/${total}`;
     label.textContent = 'cas de référence validés';
+    title.textContent = `${total} cas de référence`;
+    summary.textContent = `${passed}/${total} validés`;
     items.replaceChildren(...(Array.isArray(data.items) ? data.items.map(renderEvaluationItem) : []));
   } catch {
     score.textContent = '...';
     label.textContent = 'Suite indisponible';
+    summary.textContent = 'Résultats indisponibles';
     items.replaceChildren(create('span', 'eval-item fail', 'Les résultats des cas de référence ne sont pas disponibles.'));
   }
 }
@@ -186,6 +192,13 @@ function renderSource(source, index) {
   return article;
 }
 
+// Couleur de statut réservée aux trois décisions que le serveur peut rendre.
+const STATE_TONES = {
+  grounded: 'ok',
+  grounded_with_review_warning: 'warn',
+  insufficient_evidence: 'error',
+};
+
 function renderSignals(data, sources) {
   const payload = asRecord(data);
   const retrieval = asRecord(payload.retrieval);
@@ -195,6 +208,8 @@ function renderSignals(data, sources) {
     ['Passages retournés', plural(sources.length, 'passage')],
     ['Résultat', humanize(decision)],
   ]);
+  const tone = STATE_TONES[decision];
+  if (tone) target.lastElementChild.classList.add('state-value', `state-${tone}`);
 }
 
 function renderReceipt(data, sources) {
@@ -210,9 +225,9 @@ function renderReceipt(data, sources) {
   appendDefinitionList(document.getElementById('receipt-details'), [
     ['Méthode', asText(retrieval.strategy ?? receipt.strategy, 'non déclarée')],
     ['Passages', plural(Number(candidateCount) || sources.length, 'retourné', 'retournés')],
-    ['Reçu', asText(receiptId, 'non émis')],
-    ['Empreinte de question', asText(queryFingerprint, 'empreinte non émise')],
-    ['Empreinte', asText(evidenceHash, 'non émise')],
+    ['Reçu', asText(receiptId, 'non émis'), 'is-code'],
+    ['Empreinte de question', asText(queryFingerprint, 'empreinte non émise'), 'is-code'],
+    ['Empreinte des passages', asText(evidenceHash, 'non émise'), 'is-code'],
     ['État', humanize(receipt.state ?? payload.state ?? 'non déclaré')],
     ['Horodatage', formatDate(timestamp)],
   ]);

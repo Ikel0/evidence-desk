@@ -14,27 +14,15 @@
 
   <main class="desk-shell">
     <header class="masthead" aria-labelledby="page-title">
-      <div class="masthead-meta">
-        <p class="eyebrow">Evidence Desk <span aria-hidden="true">/</span> Recherche documentaire</p>
-        <p class="connection" id="status" role="status" aria-live="polite">Chargement du corpus</p>
-      </div>
-
-      <div class="masthead-content">
-        <div>
-          <h1 id="page-title">Evidence Desk</h1>
-          <p class="lede">Une démo locale construite autour de trois procédures fictives. Elle montre le passage trouvé, sa version et ce qui manque quand la réponse n’est pas étayée.</p>
-        </div>
-      </div>
+      <h1 id="page-title">Evidence Desk</h1>
+      <p class="lede">Une démo locale construite autour de trois procédures fictives. Elle montre le passage trouvé, sa version et ce qui manque quand la réponse n’est pas étayée.</p>
+      <p class="connection" id="status" role="status" aria-live="polite">Chargement du corpus</p>
     </header>
 
     <section class="workspace" id="workspace" aria-labelledby="workspace-title">
-      <div class="section-kicker">
-        <p class="eyebrow">Cas de test</p>
-      </div>
-
       <div class="workspace-grid">
         <div>
-          <h2 id="workspace-title">Tester une question contre le corpus fourni</h2>
+          <h2 id="workspace-title">Poser une question</h2>
           <p class="section-copy">Le corpus contient une procédure d’accès, une règle de qualité et une consigne d’incident. Si aucun passage ne répond directement, l’outil le dit au lieu de compléter.</p>
         </div>
 
@@ -45,7 +33,6 @@
             <p class="keyboard-hint"><kbd>⌘</kbd><kbd>↵</kbd> pour lancer</p>
             <button id="ask" type="submit">
               <span class="button-label">Rechercher dans les documents</span>
-              <span class="button-arrow" aria-hidden="true">↗</span>
             </button>
           </div>
           <p class="form-feedback" id="form-feedback" role="status" aria-live="polite"></p>
@@ -61,25 +48,18 @@
     </section>
 
     <section class="scope-note" aria-labelledby="scope-title">
-      <div>
-        <p class="eyebrow">Périmètre de la démo</p>
-        <h2 id="scope-title">Un petit corpus, des choix lisibles.</h2>
-      </div>
-      <div class="scope-list">
-        <p><strong>Ce qui est testé</strong> Recherche FTS5, versionnement, sources remplacées et refus quand la preuve manque.</p>
-        <p><strong>Ce qui manque encore</strong> Droits par document, import asynchrone et revue humaine. Ce n’est pas une base documentaire d’entreprise.</p>
-      </div>
+      <h2 id="scope-title">Périmètre</h2>
+      <p>Testé : FTS5, versions, sources remplacées, refus sans preuve. Pas encore : droits par document, import asynchrone, revue humaine.</p>
     </section>
 
     <details class="evaluation">
       <summary>
         <span>Méthode et tests</span>
-        <small>4 cas du corpus de démonstration</small>
+        <small id="eval-summary">Cas du corpus de démonstration</small>
       </summary>
       <div class="evaluation-content" aria-labelledby="evaluation-title">
         <div class="evaluation-heading">
-          <p class="eyebrow">Jeu de vérification</p>
-          <h2 id="evaluation-title">Les tests montrent ce que la démo sait faire, et ce qu’elle refuse.</h2>
+          <h2 id="evaluation-title">4 cas de référence</h2>
           <p class="evaluation-intro">Chaque cas vérifie un passage attendu, une réponse appuyée par ce passage ou, lorsque le corpus ne suffit pas, un refus de conclure.</p>
         </div>
         <div class="evaluation-score" aria-label="Résultat de la suite d’évaluation">
@@ -92,10 +72,7 @@
 
     <section id="result" class="result" hidden aria-labelledby="result-title" aria-live="polite">
       <div class="result-heading">
-        <div>
-          <p class="eyebrow">Résultat de recherche</p>
-          <h2 id="result-title">Réponse proposée à vérifier</h2>
-        </div>
+        <h2 id="result-title">Réponse proposée à vérifier</h2>
       </div>
 
       <div class="answer-layout">
@@ -106,10 +83,7 @@
         </article>
 
         <aside class="receipt-card" aria-labelledby="receipt-title">
-          <div class="receipt-heading">
-            <p class="eyebrow">Reçu de recherche</p>
-          </div>
-          <h3 id="receipt-title">Ce qui a été utilisé</h3>
+          <h3 id="receipt-title">Reçu de recherche</h3>
           <dl id="receipt-details" class="receipt-list"></dl>
           <p class="receipt-note">Les champs non disponibles dans le corpus sont volontairement signalés, plutôt que devinés.</p>
         </aside>
@@ -117,10 +91,7 @@
 
       <section class="sources-section" aria-labelledby="sources-title">
         <div class="sources-heading">
-          <div>
-            <p class="eyebrow">Passages retrouvés</p>
-            <h2 id="sources-title">À vérifier dans les documents</h2>
-          </div>
+          <h2 id="sources-title">Passages à vérifier dans les documents</h2>
           <p id="sources-summary" class="sources-summary"></p>
         </div>
         <div id="sources" class="sources"></div>
@@ -128,7 +99,7 @@
     </section>
 
     <footer class="footer">
-      <p>Démo locale · corpus fictif · aucune donnée utilisateur enregistrée</p>
+      <p>Démo locale, corpus fictif. Les reçus stockent une empreinte de la question, pas son texte.</p>
       <a href="https://github.com/Ikel0/evidence-desk" target="_blank" rel="noreferrer">Voir le dépôt</a>
     </footer>
   </main>
