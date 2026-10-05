@@ -1,108 +1,75 @@
 .evaluation {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  padding: 28px 0 0;
+  border-top: 1px solid var(--rule);
 }
 
-.evaluation summary {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 16px 0;
-  color: var(--ink);
-  cursor: pointer;
-  font: 600 15px/1.4 var(--sans);
-}
-
-.evaluation summary::marker {
-  color: var(--blue);
-}
-
-.evaluation summary small {
-  color: var(--muted);
-  font: 400 13px/1.4 var(--sans);
-  text-align: right;
-}
-
-.evaluation-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 24px;
-  padding: 20px 0 24px;
-  border-top: 1px solid var(--line);
-}
-
-.evaluation-heading {
-  max-width: 700px;
+.evaluation h2 {
+  font-size: 1.15rem;
 }
 
 .evaluation-intro {
-  max-width: 560px;
+  margin: 6px 0 12px;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.evaluation-details summary {
+  width: fit-content;
+  color: var(--call);
+  font: 400 14px/1.6 var(--ui);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.evaluation-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 14px/1.45 var(--ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.evaluation-table th,
+.evaluation-table td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.evaluation-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.evaluation-table td:first-child {
+  min-width: 14rem;
+}
+
+.evaluation-table .is-fail {
+  font-weight: 600;
+}
+
+.evaluation-rates {
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 15px;
-  line-height: 1.6;
+  font: 400 13px/1.5 var(--ui);
+  font-variant-numeric: tabular-nums;
 }
 
-.evaluation-score {
-  align-self: start;
-  min-width: 160px;
-  text-align: right;
-}
-
-.evaluation-score strong {
-  display: block;
-  color: var(--ink);
-  font: 500 2rem/1 var(--mono);
-}
-
-.evaluation-score span {
-  display: block;
-  margin-top: 6px;
+.scope {
+  margin: 34px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font: 400 14px/1.5 var(--ui);
 }
 
-.evaluation-items {
-  display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  gap: 8px;
-}
-
-.eval-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.eval-item i {
-  display: block;
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--error);
-}
-
-.eval-item.pass i {
-  background: var(--ok);
-}
-
-@media (max-width: 780px) {
-  .evaluation-content {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .evaluation-score {
-    text-align: left;
+@media (max-width: 900px) {
+  .scope {
+    margin-top: 20px;
   }
 }

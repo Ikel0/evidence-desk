@@ -1,10 +1,20 @@
 const form = document.getElementById('query-form');
 const question = document.getElementById('question');
-const result = document.getElementById('result');
+const reading = document.getElementById('reading');
 const status = document.getElementById('status');
 const feedback = document.getElementById('form-feedback');
 const askButton = document.getElementById('ask');
 const askLabel = askButton.querySelector('.button-label');
+const liveList = document.getElementById('live-list');
+const liveHint = document.getElementById('live-hint');
+
+const LIVE_DELAY_MS = 250;
+const LIVE_MIN_CHARS = 3;
+const INITIAL_QUESTION = 'Que se passe-t-il lorsqu’un indicateur critique échoue à un contrôle de qualité ?';
+
+// Sources que le lecteur a écartées pour la question affichée.
+const excluded = new Set();
+let shownQuestion = '';
 
 function asText(value, fallback = '') {
   if (value === undefined || value === null || value === '') return fallback;
@@ -29,12 +39,16 @@ function plural(count, singular, pluralForm = `${singular}s`) {
 
 function formatDate(value) {
   if (!value) return 'non renseignée';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(asText(value))) {
-    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(`${value}T12:00:00`));
+  const raw = asText(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(`${raw}T12:00:00`));
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return asText(value);
-  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  // SQLite écrit CURRENT_TIMESTAMP en UTC, sans fuseau : on le relit comme tel.
+  const sqlite = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/.exec(raw);
+  const date = new Date(sqlite ? `${sqlite[1]}T${sqlite[2]}Z` : raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  const text = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'medium', timeZone: 'UTC' }).format(date);
+  return `${text} UTC`;
 }
 
 function humanize(value) {
@@ -57,6 +71,13 @@ function humanize(value) {
   return labels[raw] ?? raw.replace(/[_-]/g, ' ');
 }
 
+// « Source active », « Source remplacée » : le statut s'accorde avec « source ».
+const SOURCE_STATUS = {
+  active: 'Source active',
+  draft: 'Source en brouillon',
+  superseded: 'Source remplacée',
+};
+
 function setFeedback(message = '', type = '') {
   feedback.textContent = message;
   feedback.className = `form-feedback${type ? ` ${type}` : ''}`;
@@ -64,8 +85,9 @@ function setFeedback(message = '', type = '') {
 
 function setBusy(isBusy) {
   askButton.disabled = isBusy;
-  askLabel.textContent = isBusy ? 'Recherche en cours' : 'Rechercher dans les documents';
+  askLabel.textContent = isBusy ? 'Recherche…' : 'Chercher';
   askButton.setAttribute('aria-busy', String(isBusy));
+  reading.setAttribute('aria-busy', String(isBusy));
 }
 
 async function fetchJson(url, options = {}) {
@@ -87,170 +109,299 @@ async function refreshStatus() {
     const data = await fetchJson('/api/health');
     const documents = Number(data.documents ?? data.document_count ?? 0);
     status.textContent = `${plural(documents, 'document')} actif${documents <= 1 ? '' : 's'} dans le corpus`;
-    status.classList.remove('is-error');
   } catch {
-    status.textContent = 'Corpus indisponible pour le moment';
-    status.classList.add('is-error');
+    status.textContent = 'Corpus indisponible pour le moment.';
   }
 }
 
-function renderEvaluationItem(item) {
+/* Cas de référence (suite golden) */
+
+function yesNo(value) {
+  return value ? 'oui' : 'non';
+}
+
+function percent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 'n/d';
+  return `${Math.round(number * 100)} %`;
+}
+
+function renderEvaluationRow(item) {
   const record = asRecord(item);
-  const element = create('span', `eval-item${record.passed ? ' pass' : ' fail'}`);
-  const dot = create('i');
-  dot.setAttribute('aria-hidden', 'true');
-  element.append(dot, document.createTextNode(asText(record.question, 'Cas de référence')));
-  return element;
+  const row = create('tr');
+  const expected = record.expected_abstention ? 'abstention' : 'réponse citée';
+  const outcome = create('td', record.passed ? '' : 'is-fail', record.passed ? 'validé' : 'échoué');
+  row.append(
+    create('td', '', asText(record.question, 'Cas de référence')),
+    create('td', '', expected),
+    create('td', '', record.expected_abstention ? '—' : yesNo(record.retrieved && record.source_match)),
+    create('td', '', record.expected_abstention ? '—' : yesNo(record.cited)),
+    outcome,
+  );
+  return row;
 }
 
 async function refreshEvaluation() {
-  const score = document.getElementById('eval-score');
-  const label = document.getElementById('eval-label');
-  const items = document.getElementById('eval-items');
-  const title = document.getElementById('evaluation-title');
   const summary = document.getElementById('eval-summary');
+  const items = document.getElementById('eval-items');
+  const rates = document.getElementById('eval-rates');
 
   try {
     const data = await fetchJson('/api/evaluation');
     const total = Number(data.total ?? 0);
     const passed = Number(data.passed ?? 0);
-    score.textContent = `${passed}/${total}`;
-    label.textContent = 'cas de référence validés';
-    title.textContent = `${total} cas de référence`;
-    summary.textContent = `${passed}/${total} validés`;
-    items.replaceChildren(...(Array.isArray(data.items) ? data.items.map(renderEvaluationItem) : []));
+    const suite = asText(data.suite, 'golden');
+    summary.textContent = `Suite ${suite} : ${passed} cas validés sur ${total}. Chaque cas vérifie le passage attendu et sa citation, ou une abstention quand le corpus ne contient pas la règle.`;
+    items.replaceChildren(...(Array.isArray(data.items) ? data.items.map(renderEvaluationRow) : []));
+    rates.textContent = `Rappel des passages ${percent(data.retrieval_recall)}, réponses étayées ${percent(data.grounded_answer_rate)}, citations ${percent(data.citation_rate)}, traçabilité ${percent(data.traceability_rate)}, abstentions correctes ${percent(data.safe_abstention_rate)}.`;
   } catch {
-    score.textContent = '...';
-    label.textContent = 'Suite indisponible';
-    summary.textContent = 'Résultats indisponibles';
-    items.replaceChildren(create('span', 'eval-item fail', 'Les résultats des cas de référence ne sont pas disponibles.'));
+    summary.textContent = 'Les résultats de la suite d’évaluation ne sont pas disponibles pour le moment.';
+    items.replaceChildren();
+    rates.textContent = '';
   }
 }
 
-function appendDefinitionList(target, rows) {
-  target.replaceChildren();
-  rows.forEach(([label, value, className]) => {
-    const term = create('dt', className || '', label);
-    const detail = create('dd', className || '', value);
-    target.append(term, detail);
+/* Page de lecture */
+
+// Découpe la réponse sur les marqueurs [S1], [S2]… et numérote les notes
+// dans l'ordre de leur premier appel, comme dans un texte annoté.
+function parseAnswer(text, sources) {
+  const byId = new Map(sources.map(source => [asText(asRecord(source).id), asRecord(source)]));
+  const order = [];
+  const parts = [];
+  const pattern = /\s*\[(S\d+)\]/g;
+  let last = 0;
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) parts.push({ text: text.slice(last, match.index) });
+    const id = match[1];
+    if (byId.has(id)) {
+      if (!order.includes(id)) order.push(id);
+      parts.push({ call: id });
+    }
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+
+  // Passages retournés mais jamais appelés : ils restent visibles en fin de marge.
+  const uncited = sources.map(source => asText(asRecord(source).id)).filter(id => id && !order.includes(id));
+  const numbers = new Map([...order, ...uncited].map((id, index) => [id, index + 1]));
+  return { parts, numbers, byId, cited: new Set(order) };
+}
+
+function renderAnswer(parts, numbers) {
+  const paragraph = create('p', 'answer main-col');
+  const seen = new Map();
+  parts.forEach(part => {
+    if (part.text !== undefined) {
+      paragraph.append(document.createTextNode(part.text));
+      return;
+    }
+    const number = numbers.get(part.call);
+    const occurrence = (seen.get(number) ?? 0) + 1;
+    seen.set(number, occurrence);
+    const link = create('a', 'call', `[${number}]`);
+    link.href = `#note-${number}`;
+    link.id = `call-${number}-${occurrence}`;
+    link.setAttribute('aria-label', `Note ${number}`);
+    link.dataset.note = String(number);
+    paragraph.append(document.createTextNode(' '), link);
+  });
+  return paragraph;
+}
+
+function sourceStatusLine(record) {
+  const pieces = [SOURCE_STATUS[record.status] ?? `Statut ${humanize(record.status)}`];
+  if (record.reviewed_at) pieces.push(`revue le ${formatDate(record.reviewed_at)}`);
+  const freshness = asRecord(record.freshness);
+  if (freshness.state === 'review_overdue') pieces.push('revue dépassée');
+  else if (record.review_due_at) pieces.push(`prochaine revue le ${formatDate(record.review_due_at)}`);
+  if (record.authority) pieces.push(humanize(record.authority));
+  if (record.owner) pieces.push(asText(record.owner));
+  return `${pieces.join(', ')}.`;
+}
+
+function renderNote(id, number, record, isCited) {
+  const item = create('li', 'note');
+  item.id = `note-${number}`;
+  item.dataset.note = String(number);
+
+  const head = create('p', 'note-head');
+  let numberElement;
+  if (isCited) {
+    numberElement = create('a', 'note-num', String(number));
+    numberElement.href = `#call-${number}-1`;
+    numberElement.setAttribute('aria-label', `Note ${number}, revenir à l’appel dans le texte`);
+  } else {
+    numberElement = create('span', 'note-num', String(number));
+  }
+  head.append(numberElement, create('span', 'note-doc', asText(record.document ?? record.title, 'Document sans titre')));
+  item.append(head);
+
+  const ref = create('p', 'note-ref');
+  ref.append(create('code', '', asText(record.citation, `${asText(record.source_id, id)}@${asText(record.version, '?')}#p${asText(record.position, '?')}`)));
+  item.append(ref);
+
+  if (!isCited) item.append(create('p', 'note-uncited', 'Passage retrouvé, non repris dans la réponse.'));
+
+  const excerpt = asText(record.excerpt ?? record.text, 'Aucun extrait n’a été transmis pour ce passage.');
+  item.append(create('blockquote', 'note-excerpt', excerpt));
+
+  let statusLine = sourceStatusLine(record);
+  if (excerpt.endsWith('…')) statusLine += ' Extrait abrégé : le passage complet est dans le document.';
+  item.append(create('p', 'note-status', statusLine));
+
+  const sourceId = asText(record.source_id);
+  if (sourceId) {
+    const setAside = create('button', 'note-action', 'Écarter cette source et relancer');
+    setAside.type = 'button';
+    setAside.setAttribute('aria-label', `Écarter ${sourceId} et relancer la recherche`);
+    setAside.addEventListener('click', () => {
+      excluded.add(sourceId);
+      runQuery(shownQuestion, { keepExclusions: true });
+    });
+    item.append(setAside);
+  }
+  return item;
+}
+
+function renderColophon(payload, sources) {
+  const retrieval = asRecord(payload.retrieval);
+  const receipt = asRecord(payload.receipt ?? payload.retrieval_receipt ?? payload.trace);
+  const timestamp = receipt.recorded_at ?? receipt.retrieved_at ?? receipt.created_at ?? receipt.timestamp ?? payload.created_at;
+  const receiptId = receipt.id ?? receipt.request_id ?? payload.request_id;
+  const queryFingerprint = receipt.query_fingerprint ?? receipt.query_hash ?? receipt.query_id;
+  const evidenceHash = receipt.evidence_fingerprint ?? receipt.evidence_hash ?? receipt.result_hash ?? payload.evidence_hash;
+  const count = Number(receipt.retrieved_passages ?? retrieval.returned ?? sources.length) || 0;
+  const isPreview = receipt.preview === true;
+
+  const colophon = create('footer', 'colophon main-col');
+  colophon.append(create('h3', '', 'Reçu de recherche'));
+  const list = create('dl');
+  const rows = [
+    ['Méthode', asText(retrieval.strategy ?? receipt.strategy, 'non déclarée')],
+    ['Passages', plural(count, 'passage retenu', 'passages retenus')],
+    ['Reçu', isPreview ? 'non enregistré : exemple affiché à l’ouverture' : asText(receiptId, 'non émis'), !isPreview],
+    ['Empreinte de la question', asText(queryFingerprint, 'non émise'), true],
+    ['Empreinte des passages', asText(evidenceHash, 'non émise'), true],
+    ['État', humanize(receipt.state ?? payload.state ?? 'non déclaré')],
+    ['Horodatage', timestamp ? formatDate(timestamp) : 'non enregistré'],
+  ];
+  const setAside = Array.isArray(retrieval.excluded_sources) ? retrieval.excluded_sources : [];
+  if (setAside.length) rows.splice(2, 0, ['Sources écartées', setAside.join(', ')]);
+  rows.forEach(([label, value, isCode]) => {
+    const detail = create('dd');
+    if (isCode) detail.append(create('code', '', value));
+    else detail.textContent = value;
+    list.append(create('dt', '', label), detail);
+  });
+  colophon.append(list);
+  colophon.append(create('p', 'colophon-note', 'Le reçu garde les empreintes de la question et des passages, pas leur texte en clair.'));
+  return colophon;
+}
+
+function renderResult(data, asked, options = {}) {
+  const payload = asRecord(data);
+  const sources = Array.isArray(payload.sources) ? payload.sources : [];
+  const state = asText(payload.state ?? asRecord(payload.receipt).state);
+  const abstained = state === 'insufficient_evidence' || sources.length === 0;
+
+  const article = create('article', 'reading-page');
+  article.setAttribute('aria-labelledby', 'reading-title');
+
+  const titleRow = create('div', 'page-grid');
+  const titleCol = create('div', 'main-col');
+  const title = create('h2', 'reading-title', asked);
+  title.id = 'reading-title';
+  title.tabIndex = -1;
+  titleCol.append(title);
+
+  const body = create('div', 'page-grid reading-body');
+
+  if (abstained) {
+    titleCol.append(create('p', 'reading-byline', 'Aucun passage cité.'));
+    const main = create('div', 'main-col');
+    main.append(
+      create('p', 'abstention-state', 'Preuves insuffisantes.'),
+      create('p', 'answer', asText(payload.answer, 'Le corpus indexé ne contient pas de passage actif qui réponde à cette question.')),
+    );
+    const margin = create('p', 'margin-col abstention-note', asText(asRecord(payload.retrieval).reason, 'Aucun passage actif ne soutient cette question.'));
+    body.append(main, margin);
+  } else {
+    const { parts, numbers, byId, cited } = parseAnswer(asText(payload.answer), sources);
+    const byline = [plural(cited.size, 'passage cité', 'passages cités'), humanize(payload.generation ?? asRecord(payload.receipt).generation)];
+    if (state === 'grounded_with_review_warning') byline.push('au moins une source a dépassé sa date de revue');
+    titleCol.append(create('p', 'reading-byline', `${byline.join(', ')}.`));
+
+    const notes = create('ol', 'notes margin-col');
+    notes.setAttribute('aria-label', 'Passages cités');
+    [...numbers.entries()].forEach(([id, number]) => notes.append(renderNote(id, number, byId.get(id), cited.has(id))));
+    body.append(renderAnswer(parts, numbers), notes);
+  }
+
+  const colophonRow = create('div', 'page-grid');
+  colophonRow.append(renderColophon(payload, sources));
+
+  const setAside = Array.isArray(asRecord(payload.retrieval).excluded_sources) ? payload.retrieval.excluded_sources : [];
+  if (setAside.length) {
+    const banner = create('div', 'modified');
+    banner.append(create('p', '', `Scénario modifié par vous : ${setAside.length > 1 ? `les sources ${setAside.join(', ')} sont écartées` : `la source ${setAside[0]} est écartée`} de la recherche. Les cas de référence ne portent pas sur ce scénario.`));
+    const restore = create('button', 'note-action', 'Rétablir le corpus complet');
+    restore.type = 'button';
+    restore.addEventListener('click', () => {
+      excluded.clear();
+      runQuery(shownQuestion, { keepExclusions: true });
+    });
+    banner.append(restore);
+    titleCol.append(banner);
+  }
+
+  titleRow.append(titleCol);
+  article.append(titleRow, body, colophonRow);
+  linkCallsAndNotes(article);
+  reading.replaceChildren(article);
+
+  if (!options.initial) {
+    // Ne déplace la vue que si la page de lecture commence hors de l'écran.
+    if (article.getBoundingClientRect().top > window.innerHeight * .6) {
+      const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      article.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    }
+    title.focus({ preventScroll: true });
+  }
+}
+
+// Survol ou focus d'un appel : son passage est mis en évidence, et inversement.
+// Le lien reste la voie principale (clic, toucher, clavier) ; le surlignage n'ajoute aucune information.
+function linkCallsAndNotes(root) {
+  const toggle = (number, on) => {
+    root.querySelectorAll(`[data-note="${number}"]`).forEach(element => element.classList.toggle('is-linked', on));
+  };
+  root.querySelectorAll('[data-note]').forEach(element => {
+    const number = element.dataset.note;
+    ['mouseenter', 'focusin'].forEach(type => element.addEventListener(type, () => toggle(number, true)));
+    ['mouseleave', 'focusout'].forEach(type => element.addEventListener(type, () => toggle(number, false)));
   });
 }
 
-function sourceMetadata(source) {
-  const record = asRecord(source);
-  const rows = [
-    ['Version', asText(record.version, 'non déclarée')],
-    ['Passage', record.position ? `n° ${asText(record.position)}` : 'non déclaré'],
-  ];
-
-  const authority = record.authority ?? record.source_authority ?? record.owner;
-  if (authority) rows.push(['Niveau déclaré', humanize(authority)]);
-
-  const freshness = record.freshness ?? record.freshness_label;
-  if (freshness && typeof freshness === 'object') {
-    const freshnessRecord = asRecord(freshness);
-    rows.push(['Fraîcheur', asText(freshnessRecord.label ?? freshnessRecord.state, 'non déclarée')]);
-  }
-  else if (freshness) rows.push(['Fraîcheur', asText(freshness)]);
-  else if (record.updated_at ?? record.updatedAt ?? record.published_at) rows.push(['Mis à jour', formatDate(record.updated_at ?? record.updatedAt ?? record.published_at)]);
-  else rows.push(['Fraîcheur', 'non déclarée']);
-
-  if (record.reviewed_at) rows.push(['Dernière revue', formatDate(record.reviewed_at)]);
-
-  const state = record.status ?? record.lifecycle ?? record.state;
-  if (state) rows.push(['Statut', humanize(state)]);
-  return rows;
-}
-
-function renderSource(source, index) {
-  const record = asRecord(source);
-  const article = create('article', 'source-card');
-  const sourceId = create('p', 'source-id', asText(record.id, `S${index + 1}`));
-  const content = create('div', 'source-content');
-  const heading = create('div', 'source-heading');
-  const title = create('h3', '', asText(record.document ?? record.title, 'Document sans titre'));
-  const state = create('span', 'source-state', humanize(record.status ?? record.lifecycle ?? 'métadonnées partielles'));
-  heading.append(title, state);
-
-  const metadata = create('dl', 'source-metadata');
-  appendDefinitionList(metadata, sourceMetadata(record));
-
-  const quote = create('blockquote', '', asText(record.excerpt ?? record.text, 'Aucun extrait n’a été transmis pour cette source.'));
-  content.append(heading, metadata, quote);
-
-  if (asText(record.excerpt).endsWith('…')) {
-    content.append(create('p', 'source-note', 'Extrait abrégé. Consultez le document source pour le passage complet.'));
-  }
-
-  const proof = record.citation ?? record.content_fingerprint ?? record.content_hash ?? record.hash ?? record.chunk_id;
-  if (proof) {
-    const reference = create('p', 'source-reference', `Référence ${asText(proof)}`);
-    content.append(reference);
-  }
-
-  article.append(sourceId, content);
-  return article;
-}
-
-// Couleur de statut réservée aux trois décisions que le serveur peut rendre.
-const STATE_TONES = {
-  grounded: 'ok',
-  grounded_with_review_warning: 'warn',
-  insufficient_evidence: 'error',
-};
-
-function renderSignals(data, sources) {
-  const payload = asRecord(data);
-  const retrieval = asRecord(payload.retrieval);
-  const target = document.getElementById('signals');
-  const decision = payload.decision ?? payload.outcome ?? payload.state ?? (sources.length ? 'réponse sourcée' : 'preuves insuffisantes');
-  appendDefinitionList(target, [
-    ['Passages retournés', plural(sources.length, 'passage')],
-    ['Résultat', humanize(decision)],
-  ]);
-  const tone = STATE_TONES[decision];
-  if (tone) target.lastElementChild.classList.add('state-value', `state-${tone}`);
-}
-
-function renderReceipt(data, sources) {
-  const payload = asRecord(data);
-  const retrieval = asRecord(payload.retrieval);
-  const receipt = asRecord(payload.receipt ?? payload.retrieval_receipt ?? payload.trace);
-  const timestamp = receipt.retrieved_at ?? receipt.created_at ?? receipt.timestamp ?? receipt.recorded_at ?? payload.created_at;
-  const receiptId = receipt.id ?? receipt.request_id ?? payload.request_id;
-  const queryFingerprint = receipt.query_fingerprint ?? receipt.query_hash ?? receipt.query_id;
-  const evidenceHash = receipt.evidence_hash ?? receipt.result_hash ?? receipt.evidence_fingerprint ?? payload.evidence_hash;
-  const candidateCount = retrieval.candidates ?? receipt.candidates ?? receipt.returned ?? receipt.retrieved_passages ?? sources.length;
-
-  appendDefinitionList(document.getElementById('receipt-details'), [
-    ['Méthode', asText(retrieval.strategy ?? receipt.strategy, 'non déclarée')],
-    ['Passages', plural(Number(candidateCount) || sources.length, 'retourné', 'retournés')],
-    ['Reçu', asText(receiptId, 'non émis'), 'is-code'],
-    ['Empreinte de question', asText(queryFingerprint, 'empreinte non émise'), 'is-code'],
-    ['Empreinte des passages', asText(evidenceHash, 'non émise'), 'is-code'],
-    ['État', humanize(receipt.state ?? payload.state ?? 'non déclaré')],
-    ['Horodatage', formatDate(timestamp)],
-  ]);
-}
-
-function renderResult(data) {
-  const payload = asRecord(data);
-  const sources = Array.isArray(payload.sources) ? payload.sources : [];
-  const answer = asText(payload.answer, sources.length ? 'Le corpus a retourné des passages à consulter.' : 'Le corpus ne contient pas assez de preuves pour répondre à cette question.');
-  document.getElementById('answer').textContent = answer;
-  renderSignals(payload, sources);
-  renderReceipt(payload, sources);
-
-  const sourceRoot = document.getElementById('sources');
-  const sourceSummary = document.getElementById('sources-summary');
-  sourceRoot.replaceChildren(...sources.map(renderSource));
-  sourceSummary.textContent = sources.length
-    ? `${plural(sources.length, 'passage')} à comparer avec la réponse`
-    : 'Aucun passage suffisamment proche. Le corpus ne permet pas de conclure.';
-  result.hidden = false;
-
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+async function runQuery(value, options = {}) {
+  if (!options.keepExclusions) excluded.clear();
+  setFeedback('');
+  setBusy(true);
+  try {
+    const data = await fetchJson('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: value, exclude_sources: [...excluded], preview: options.initial === true }),
+    });
+    shownQuestion = value;
+    renderResult(data, value, options);
+    refreshCandidates(value);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : '';
+    setFeedback(`La recherche n’a pas abouti. ${detail}`.trim(), 'is-error');
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -262,23 +413,76 @@ async function submitQuestion(event) {
     question.focus();
     return;
   }
+  clearTimeout(liveTimer);
+  runQuery(value);
+}
 
-  setFeedback('');
-  setBusy(true);
+/* Candidats pendant la frappe : le vrai classement FTS5, sans reçu. */
+
+let liveTimer;
+let liveController;
+
+function candidateState(row) {
+  if (row.excluded) return 'source écartée par vous';
+  if (row.retained) return 'retenu pour la réponse';
+  return 'sous le seuil de recouvrement';
+}
+
+function renderCandidates(data) {
+  const rows = Array.isArray(data.candidates) ? data.candidates.map(asRecord) : [];
+  if (!rows.length) {
+    liveHint.textContent = 'Aucun passage ne contient ces termes : la réponse serait une abstention.';
+    liveList.replaceChildren();
+    return;
+  }
+  const kept = rows.filter(row => row.retained).length;
+  liveHint.textContent = kept
+    ? `${plural(Number(data.fts_matches) || rows.length, 'passage trouvé', 'passages trouvés')} par FTS5, ${plural(kept, 'retenu', 'retenus')} pour la réponse.`
+    : `${plural(Number(data.fts_matches) || rows.length, 'passage trouvé', 'passages trouvés')}, aucun ne passe le seuil : la réponse serait une abstention.`;
+  liveList.replaceChildren(...rows.map(row => {
+    const item = create('li', `live-row${row.retained ? ' is-kept' : ''}`);
+    const head = create('p', 'live-head');
+    head.append(
+      create('span', 'live-rank', `${asText(row.rank)}.`),
+      create('code', '', asText(row.citation)),
+    );
+    const score = Number(row.bm25);
+    const scoreText = Number.isFinite(score) ? score.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'n/d';
+    item.append(head, create('p', 'live-meta', `bm25 ${scoreText}, ${plural(Number(row.overlap) || 0, 'terme commun', 'termes communs')}, ${candidateState(row)}`));
+    return item;
+  }));
+}
+
+async function refreshCandidates(value) {
+  const text = asText(value).trim();
+  liveController?.abort();
+  if (text.length < LIVE_MIN_CHARS) {
+    liveList.replaceChildren();
+    liveHint.textContent = text.length
+      ? `Encore ${LIVE_MIN_CHARS - text.length} caractère${LIVE_MIN_CHARS - text.length > 1 ? 's' : ''} avant la recherche.`
+      : 'Le classement se met à jour à partir de 3 caractères, sans écrire de reçu.';
+    return;
+  }
+  liveController = new AbortController();
   try {
-    const data = await fetchJson('/api/query', {
+    const data = await fetchJson('/api/candidates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: value }),
+      body: JSON.stringify({ question: text, exclude_sources: text === shownQuestion ? [...excluded] : [] }),
+      signal: liveController.signal,
     });
-    renderResult(data);
-    setFeedback('Recherche terminée. Lisez les passages avant de réutiliser la réponse.', 'is-success');
+    renderCandidates(data);
   } catch (error) {
-    setFeedback(error instanceof Error ? error.message : 'La recherche a échoué.', 'is-error');
-  } finally {
-    setBusy(false);
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    liveHint.textContent = 'Le classement n’est pas disponible pour le moment.';
+    liveList.replaceChildren();
   }
 }
+
+question.addEventListener('input', () => {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => refreshCandidates(question.value), LIVE_DELAY_MS);
+});
 
 form.addEventListener('submit', submitQuestion);
 
@@ -294,10 +498,13 @@ question.addEventListener('keydown', event => {
 document.querySelectorAll('[data-question]').forEach(button => {
   button.addEventListener('click', () => {
     question.value = asText(button.dataset.question);
-    question.focus();
-    setFeedback('Question prête. Lancez la recherche lorsque vous le souhaitez.');
+    form.requestSubmit();
   });
 });
 
 refreshStatus();
 refreshEvaluation();
+
+// État initial complet et statique : une vraie réponse citée, calculée sans écrire de reçu.
+question.value = INITIAL_QUESTION;
+runQuery(INITIAL_QUESTION, { initial: true });
