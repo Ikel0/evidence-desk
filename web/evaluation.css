@@ -1,50 +1,54 @@
 .evaluation {
-  padding: 28px 0 0;
+  padding: 26px 0 0;
   border-top: 1px solid var(--rule);
 }
 
 .evaluation h2 {
-  font-size: 1.15rem;
+  font-size: 1.35rem;
 }
 
 .evaluation-intro {
-  margin: 6px 0 12px;
-  font-size: 1rem;
+  margin: 6px 0 10px;
   font-variant-numeric: tabular-nums;
 }
 
 .evaluation-details summary {
   width: fit-content;
-  color: var(--call);
-  font: 400 14px/1.6 var(--ui);
+  color: var(--link);
+  font-size: 14px;
+  line-height: 1.6;
   cursor: pointer;
+}
+
+.evaluation-details summary:hover {
   text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .table-wrap {
-  margin-top: 12px;
+  margin-top: 10px;
   overflow-x: auto;
 }
 
 .evaluation-table {
   width: 100%;
+  border: 1px solid var(--rule);
   border-collapse: collapse;
-  font: 400 14px/1.45 var(--ui);
+  font-size: 14px;
+  line-height: 1.45;
   font-variant-numeric: tabular-nums;
 }
 
 .evaluation-table th,
 .evaluation-table td {
-  padding: 8px 10px 8px 0;
-  border-bottom: 1px solid var(--rule);
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
   text-align: left;
   vertical-align: top;
 }
 
 .evaluation-table th {
-  color: var(--muted);
-  font-weight: 600;
+  background: var(--field);
+  font-weight: 700;
 }
 
 .evaluation-table td:first-child {
@@ -52,20 +56,22 @@
 }
 
 .evaluation-table .is-fail {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .evaluation-rates {
   margin: 10px 0 0;
   color: var(--muted);
-  font: 400 13px/1.5 var(--ui);
+  font-size: 13px;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
 
 .scope {
   margin: 34px 0 0;
   color: var(--muted);
-  font: 400 14px/1.5 var(--ui);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {

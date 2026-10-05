@@ -189,6 +189,16 @@ function parseAnswer(text, sources) {
   return { parts, numbers, byId, cited: new Set(order) };
 }
 
+// Le serveur préfixe la réponse extractive ; la page le dit déjà par sa structure.
+// Le texte renvoyé par l'API (et évalué par la suite golden) reste inchangé.
+const ANSWER_PREFIX = /^D[’']après les passages récupérés\s*:\s*/;
+
+function displayedAnswer(value) {
+  const text = asText(value);
+  const stripped = text.replace(ANSWER_PREFIX, '');
+  return stripped ? stripped.charAt(0).toUpperCase() + stripped.slice(1) : text;
+}
+
 function renderAnswer(parts, numbers) {
   const paragraph = create('p', 'answer main-col');
   const seen = new Map();
@@ -200,12 +210,14 @@ function renderAnswer(parts, numbers) {
     const number = numbers.get(part.call);
     const occurrence = (seen.get(number) ?? 0) + 1;
     seen.set(number, occurrence);
+    const sup = create('sup', 'reference');
     const link = create('a', 'call', `[${number}]`);
     link.href = `#note-${number}`;
     link.id = `call-${number}-${occurrence}`;
     link.setAttribute('aria-label', `Note ${number}`);
     link.dataset.note = String(number);
-    paragraph.append(document.createTextNode(' '), link);
+    sup.append(link);
+    paragraph.append(sup);
   });
   return paragraph;
 }
@@ -226,16 +238,16 @@ function renderNote(id, number, record, isCited) {
   item.id = `note-${number}`;
   item.dataset.note = String(number);
 
+  // Comme une liste de références : numéro, flèche de retour vers l'appel, titre du document.
   const head = create('p', 'note-head');
-  let numberElement;
+  head.append(create('span', 'note-num', `${number}.`));
   if (isCited) {
-    numberElement = create('a', 'note-num', String(number));
-    numberElement.href = `#call-${number}-1`;
-    numberElement.setAttribute('aria-label', `Note ${number}, revenir à l’appel dans le texte`);
-  } else {
-    numberElement = create('span', 'note-num', String(number));
+    const back = create('a', 'note-back', '↑');
+    back.href = `#call-${number}-1`;
+    back.setAttribute('aria-label', `Revenir à l’appel ${number} dans le texte`);
+    head.append(back);
   }
-  head.append(numberElement, create('span', 'note-doc', asText(record.document ?? record.title, 'Document sans titre')));
+  head.append(create('cite', 'note-doc', asText(record.document ?? record.title, 'Document sans titre')));
   item.append(head);
 
   const ref = create('p', 'note-ref');
@@ -253,7 +265,7 @@ function renderNote(id, number, record, isCited) {
 
   const sourceId = asText(record.source_id);
   if (sourceId) {
-    const setAside = create('button', 'note-action', 'Écarter cette source et relancer');
+    const setAside = create('button', 'note-action', 'Écarter cette source');
     setAside.type = 'button';
     setAside.setAttribute('aria-label', `Écarter ${sourceId} et relancer la recherche`);
     setAside.addEventListener('click', () => {
@@ -328,15 +340,19 @@ function renderResult(data, asked, options = {}) {
     const margin = create('p', 'margin-col abstention-note', asText(asRecord(payload.retrieval).reason, 'Aucun passage actif ne soutient cette question.'));
     body.append(main, margin);
   } else {
-    const { parts, numbers, byId, cited } = parseAnswer(asText(payload.answer), sources);
+    const { parts, numbers, byId, cited } = parseAnswer(displayedAnswer(payload.answer), sources);
     const byline = [plural(cited.size, 'passage cité', 'passages cités'), humanize(payload.generation ?? asRecord(payload.receipt).generation)];
     if (state === 'grounded_with_review_warning') byline.push('au moins une source a dépassé sa date de revue');
     titleCol.append(create('p', 'reading-byline', `${byline.join(', ')}.`));
 
-    const notes = create('ol', 'notes margin-col');
-    notes.setAttribute('aria-label', 'Passages cités');
+    const notes = create('ol', 'notes');
+    notes.setAttribute('aria-labelledby', 'notes-title');
+    const margin = create('section', 'margin-col references');
+    const notesTitle = create('h3', 'references-title', 'Références');
+    notesTitle.id = 'notes-title';
+    margin.append(notesTitle, notes);
     [...numbers.entries()].forEach(([id, number]) => notes.append(renderNote(id, number, byId.get(id), cited.has(id))));
-    body.append(renderAnswer(parts, numbers), notes);
+    body.append(renderAnswer(parts, numbers), margin);
   }
 
   const colophonRow = create('div', 'page-grid');

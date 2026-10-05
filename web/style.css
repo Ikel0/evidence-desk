@@ -1,17 +1,20 @@
 :root {
   --bg: #ffffff;
-  --ink: #1b1b1a;
-  --muted: #5a5a57;
-  --rule: #dcdcd8;
-  /* Seule couleur porteuse de sens : ce qui renvoie à un passage (appels, liens). */
-  --call: #a4321b;
-  --call-dark: #7a2412;
-  --read: "Literata", Georgia, "Times New Roman", serif;
-  --ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --main: 38rem;
+  --ink: #202122;
+  --muted: #54595d;
+  --rule: #c8ccd1;
+  --rule-soft: #e3e5e8;
+  --field: #f6f7f8;
+  /* Seule couleur porteuse de sens : ce qui renvoie à un passage (appels, liens, action principale). */
+  --link: #1f4f8f;
+  --link-dark: #163a6b;
+  --link-wash: #e8eff8;
+  --serif: Georgia, "Linux Libertine", "Times New Roman", Times, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --main: 40rem;
   --margin: 17rem;
-  --gap: 3rem;
+  --gap: 2.5rem;
 }
 
 * {
@@ -34,36 +37,40 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 400 18px/1.6 var(--read);
-  font-optical-sizing: auto;
+  font: 400 16px/1.6 var(--sans);
 }
 
 h1,
-h2,
-h3 {
+h2 {
   margin: 0;
-  font-weight: 600;
+  font-family: var(--serif);
+  font-weight: 400;
   line-height: 1.25;
 }
 
+h3 {
+  margin: 0;
+  font: 700 15px/1.4 var(--sans);
+}
+
 a {
-  color: var(--call);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
+  color: var(--link);
+  text-decoration: none;
 }
 
 a:hover {
-  color: var(--call-dark);
+  color: var(--link-dark);
+  text-decoration: underline;
 }
 
 :focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
 }
 
 code {
-  font-family: var(--code);
-  font-size: .86em;
+  font-family: var(--mono);
+  font-size: .875em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -81,20 +88,71 @@ code {
   top: -100px;
   left: 16px;
   padding: 8px 12px;
-  background: var(--ink);
-  color: var(--bg);
-  font: 500 14px/1.4 var(--ui);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  font-size: 14px;
 }
 
 .skip-link:focus {
   top: 12px;
 }
 
-/* Grille de lecture : colonne de texte + colonne de marge. */
+/* Boutons : gris clair bordé pour les actions secondaires, bleu plein pour lancer la recherche. */
+button {
+  font-family: var(--sans);
+}
+
+.button,
+.note-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 5px 12px;
+  border: 1px solid #8f969d;
+  border-radius: 4px;
+  background: var(--field);
+  color: var(--ink);
+  font: 600 14px/1.3 var(--sans);
+  cursor: pointer;
+}
+
+.note-action:hover {
+  border-color: var(--ink);
+  background: #eceef0;
+}
+
+.note-action:active {
+  background: #e1e4e7;
+}
+
+.button-primary {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--link);
+  border-radius: 4px;
+  background: var(--link);
+  color: #ffffff;
+  font: 600 15px/1 var(--sans);
+  cursor: pointer;
+}
+
+.button-primary:hover {
+  border-color: var(--link-dark);
+  background: var(--link-dark);
+}
+
+.button-primary:disabled {
+  border-color: #8f969d;
+  background: #8f969d;
+  cursor: progress;
+}
+
+/* Grille : une colonne de lecture et sa marge de références. */
 .page {
-  max-width: calc(var(--main) + var(--gap) + var(--margin) + 80px);
+  max-width: calc(var(--main) + var(--gap) + var(--margin) + 64px);
   margin: 0 auto;
-  padding: 0 40px;
+  padding: 0 32px;
 }
 
 .page-grid {
@@ -115,87 +173,68 @@ code {
 }
 
 .back {
-  padding: 20px 0 0;
-  font: 400 14px/1.4 var(--ui);
-}
-
-.back a {
-  color: var(--muted);
+  padding: 18px 0 0;
+  font-size: 14px;
 }
 
 /* En-tête */
 .masthead {
-  padding: 22px 0 28px;
+  padding: 18px 0 26px;
   border-bottom: 1px solid var(--rule);
 }
 
 .masthead h1 {
-  font-size: 2rem;
-  letter-spacing: -.01em;
+  font-size: 2.1rem;
 }
 
 .lede {
-  margin: 6px 0 20px;
-  color: var(--ink);
-  font-size: 1.06rem;
+  margin: 8px 0 22px;
+  font-size: 1.0625rem;
   line-height: 1.55;
 }
 
 .ask label {
   display: block;
   margin-bottom: 6px;
-  font: 600 14px/1.4 var(--ui);
+  font-weight: 700;
+  font-size: 15px;
 }
 
 .ask-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: stretch;
 }
 
 .ask textarea {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 3.4rem;
-  padding: 10px 12px;
-  border: 1px solid #8a8a85;
-  border-radius: 3px;
+  min-height: 3.6rem;
+  padding: 8px 10px;
+  border: 1px solid #8f969d;
+  border-radius: 4px;
   background: var(--bg);
   color: var(--ink);
-  font: 400 16px/1.45 var(--ui);
+  font: 400 16px/1.45 var(--sans);
   resize: vertical;
 }
 
+.ask textarea:hover {
+  border-color: var(--ink);
+}
+
 .ask textarea:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
-}
-
-.ask button {
-  flex: 0 0 auto;
-  padding: 0 20px;
-  border: 1px solid var(--ink);
-  border-radius: 3px;
-  background: var(--ink);
-  color: var(--bg);
-  font: 600 15px/1 var(--ui);
-  cursor: pointer;
-}
-
-.ask button:hover {
-  background: #3a3a37;
-}
-
-.ask button:disabled {
-  cursor: progress;
-  opacity: .7;
+  border-color: var(--link);
+  outline: 1px solid var(--link);
+  outline-offset: 0;
 }
 
 .ask-hint,
 .form-feedback {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  font: 400 13px/1.45 var(--ui);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .form-feedback:empty {
@@ -204,23 +243,23 @@ code {
 
 .form-feedback.is-error {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 kbd {
   padding: 0 4px;
   border: 1px solid var(--rule);
   border-radius: 3px;
+  background: var(--field);
   font: inherit;
 }
 
 .side {
-  padding-top: 12px;
-  font-family: var(--ui);
+  padding-top: 10px;
 }
 
 .corpus-status {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   color: var(--muted);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
@@ -230,176 +269,48 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0 16px;
-  margin-top: 18px;
-  font-family: var(--ui);
+  gap: 0 14px;
+  margin-top: 16px;
 }
 
 .examples h2 {
-  font: 600 14px/1.4 var(--ui);
+  font: 700 14px/1.4 var(--sans);
 }
 
 .examples ul {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 16px;
+  gap: 0 14px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Les questions d'essai se lisent comme des liens : elles lancent la recherche. */
 .example {
   min-height: 32px;
   padding: 4px 0;
   border: 0;
   background: none;
-  color: var(--ink);
-  font: 400 14px/1.4 var(--ui);
+  color: var(--link);
+  font: 400 14px/1.4 var(--sans);
   text-align: left;
-  text-decoration: underline;
-  text-decoration-color: #b5b5b0;
-  text-underline-offset: 4px;
   cursor: pointer;
 }
 
 .example:hover {
-  text-decoration-color: currentColor;
-}
-
-/* Page de lecture */
-.reading {
-  padding: 32px 0 8px;
-}
-
-.reading-empty p {
-  margin: 0 0 32px;
-  color: var(--muted);
-  font-size: 1rem;
-}
-
-.reading-title {
-  font-size: 1.5rem;
-  line-height: 1.3;
-}
-
-.reading-title:focus {
-  outline: none;
-}
-
-.reading-byline {
-  margin: 6px 0 22px;
-  color: var(--muted);
-  font-size: .94rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.reading-body {
-  row-gap: 0;
-}
-
-.answer {
-  margin: 0 0 1em;
-  hyphens: manual;
-}
-
-.call {
-  padding: 0 1px;
-  font-size: .8em;
-  font-variant-numeric: tabular-nums;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.call:hover {
+  color: var(--link-dark);
   text-decoration: underline;
 }
 
-.notes {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 14.5px;
-  line-height: 1.5;
-}
-
-.note {
-  margin: 0 0 22px;
-  scroll-margin-top: 24px;
-}
-
-.note:target .note-num {
-  background: var(--call);
-  color: var(--bg);
-}
-
-.note-head {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  margin: 0;
-}
-
-.note-num {
-  flex: 0 0 auto;
-  min-width: 1.5em;
-  padding: 0 3px;
-  border-radius: 2px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  text-align: center;
-  text-decoration: none;
-}
-
-.note-doc {
-  font-weight: 600;
-}
-
-.note-ref {
-  margin: 2px 0 6px;
-  overflow-wrap: anywhere;
-}
-
-.note-ref code {
-  font-size: 13px;
-}
-
-.note-excerpt {
-  margin: 0;
-}
-
-.note-status {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 13.5px;
-}
-
-.note-uncited {
-  margin: 0 0 6px;
-  color: var(--muted);
-  font-size: 13.5px;
-}
-
-.abstention-state {
-  margin: 0 0 .5em;
-  font-weight: 600;
-}
-
-.abstention-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14.5px;
-  line-height: 1.5;
-}
-
-
 /* Candidats pendant la frappe */
 .live {
-  margin: 0 0 22px;
+  margin: 0;
 }
 
 .live h2 {
   margin-bottom: 2px;
-  font: 600 14px/1.4 var(--ui);
+  font: 700 14px/1.4 var(--sans);
 }
 
 .live-hint {
@@ -418,7 +329,7 @@ kbd {
 
 .live-row {
   padding: 5px 0;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-soft);
 }
 
 .live-head {
@@ -446,67 +357,191 @@ kbd {
 }
 
 .live-row.is-kept .live-head {
-  font-weight: 600;
+  font-weight: 700;
 }
 
-/* Lien appel ↔ passage, sans mouvement */
+/* Page de lecture */
+.reading {
+  padding: 28px 0 8px;
+}
+
+.reading-empty p {
+  margin: 0 0 32px;
+  color: var(--muted);
+}
+
+.reading-title {
+  font-size: 1.65rem;
+}
+
+.reading-title:focus {
+  outline: none;
+}
+
+.reading-byline {
+  margin: 6px 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.answer {
+  margin: 0 0 1em;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+
+/* Appels de note en exposant, comme dans une encyclopédie. */
+sup.reference {
+  font-size: .75em;
+  line-height: 0;
+  vertical-align: super;
+  white-space: nowrap;
+}
+
+.call {
+  padding: 0 1px;
+  font-variant-numeric: tabular-nums;
+}
+
 .call.is-linked {
-  background: #f7e7e2;
+  background: var(--link-wash);
   text-decoration: underline;
 }
 
-.note.is-linked .note-num {
-  background: var(--call);
-  color: var(--bg);
+.references-title {
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
 }
 
-.note-action {
-  display: inline-block;
-  min-height: 32px;
+.notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.note {
+  margin: 0 0 6px;
+  padding: 6px 6px 8px;
+  border-radius: 2px;
+  scroll-margin-top: 24px;
+}
+
+.note:target,
+.note.is-linked {
+  background: var(--link-wash);
+}
+
+.note-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0;
+}
+
+.note-num {
+  flex: 0 0 auto;
+  min-width: 1.4em;
+  font-variant-numeric: tabular-nums;
+}
+
+.note-back {
+  flex: 0 0 auto;
+  min-width: 1.2em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.note-doc {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.note-ref {
+  margin: 2px 0 6px calc(1.4em + 6px);
+  overflow-wrap: anywhere;
+}
+
+.note-ref code {
+  font-size: 12.5px;
+}
+
+.note-excerpt,
+.note-status,
+.note-uncited {
+  margin-left: calc(1.4em + 6px);
+}
+
+.note-excerpt {
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.note-status {
   margin-top: 6px;
-  padding: 4px 10px;
-  border: 1px solid #8a8a85;
-  border-radius: 3px;
-  background: var(--bg);
-  color: var(--ink);
-  font: 400 13px/1.3 var(--ui);
-  cursor: pointer;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
-.note-action:hover {
-  border-color: var(--ink);
+.note-uncited {
+  margin-top: 0;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note .note-action {
+  margin: 8px 0 0 calc(1.4em + 6px);
+}
+
+.abstention-state {
+  margin: 0 0 .4em;
+  font-weight: 700;
+}
+
+.abstention-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .modified {
-  margin: -10px 0 22px;
-  padding: 10px 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  font: 400 14px/1.5 var(--ui);
+  margin: -6px 0 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--field);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .modified p {
-  margin: 0;
+  margin: 0 0 8px;
 }
 
 /* Colophon : le reçu de recherche, en fin de page. */
 .colophon {
-  margin-top: 24px;
-  padding: 20px 0 32px;
+  margin-top: 20px;
+  padding: 18px 0 30px;
   border-top: 1px solid var(--rule);
 }
 
 .colophon h3 {
-  margin-bottom: 10px;
-  font-size: 1rem;
+  margin-bottom: 8px;
 }
 
 .colophon dl {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 4px 20px;
+  gap: 3px 20px;
   margin: 0;
-  font-size: 15px;
+  font-size: 14.5px;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
@@ -521,9 +556,9 @@ kbd {
 }
 
 .colophon-note {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 /* Pied de page */
@@ -532,18 +567,19 @@ kbd {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 24px;
-  margin-top: 40px;
-  padding: 20px 0 32px;
+  margin-top: 36px;
+  padding: 18px 0 30px;
   border-top: 1px solid var(--rule);
   color: var(--muted);
-  font: 400 14px/1.5 var(--ui);
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 
 .site-footer p {
   margin: 0;
 }
 
-/* Sous 900 px, la marge passe sous le texte : les notes suivent leur paragraphe. */
+/* Sous 900 px, la marge passe sous le texte : les références suivent leur paragraphe. */
 @media (max-width: 900px) {
   .page {
     padding: 0 16px;
@@ -566,37 +602,38 @@ kbd {
     min-height: 44px;
   }
 
-
-  .notes {
+  .references {
     margin: 0 0 8px;
-    padding: 14px 0 0 14px;
-    border-top: 1px solid var(--rule);
   }
 
-  .note {
-    margin-bottom: 16px;
+  /* Zones de toucher plus larges que le glyphe, sans décaler la ligne. */
+  .note-back,
+  .call {
+    display: inline-block;
+    padding: 8px 6px;
+    margin: -8px -6px;
+  }
+
+  .note-back {
+    margin: -8px 0;
   }
 }
 
 @media (max-width: 520px) {
-  body {
-    font-size: 17px;
-  }
-
   .masthead h1 {
-    font-size: 1.7rem;
+    font-size: 1.8rem;
   }
 
   .ask-row {
     flex-direction: column;
   }
 
-  .ask button {
+  .button-primary {
     min-height: 44px;
   }
 
   .reading-title {
-    font-size: 1.35rem;
+    font-size: 1.4rem;
   }
 
   .colophon dl {

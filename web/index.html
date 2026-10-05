@@ -6,9 +6,6 @@
   <meta name="description" content="Evidence Desk cherche la réponse dans trois procédures fictives, cite le passage exact de chaque phrase et s’abstient quand le corpus ne suffit pas.">
   <title>Evidence Desk</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&display=swap">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="evaluation.css">
 </head>
@@ -29,7 +26,7 @@
           <label for="question">Votre question</label>
           <div class="ask-row">
             <textarea id="question" name="question" rows="2" placeholder="Qui valide une demande d’accès à une donnée sensible ?" required aria-describedby="shortcut"></textarea>
-            <button id="ask" type="submit"><span class="button-label">Chercher</span></button>
+            <button id="ask" class="button-primary" type="submit"><span class="button-label">Chercher</span></button>
           </div>
           <p class="ask-hint" id="shortcut"><kbd id="shortcut-modifier">Ctrl</kbd> + <kbd>Entrée</kbd> lance aussi la recherche.</p>
           <p class="form-feedback" id="form-feedback" role="status" aria-live="polite"></p>
