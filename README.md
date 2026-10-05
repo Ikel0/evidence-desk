@@ -42,9 +42,13 @@ Quel est le protocole de rotation des clés cryptographiques ?
 
 Le corpus fourni ne contient pas cette règle. Une bonne réponse est donc un refus clair, pas une invention.
 
-Dans l’interface, cette question ne retourne aucun passage : le résultat est « preuves insuffisantes » et le reçu ne garde que les empreintes de la question et des passages.
+Dans l’interface, cette question ne retourne aucun passage : la page de lecture affiche « preuves insuffisantes » et le reçu ne garde que les empreintes de la question et des passages.
 
-![Evidence Desk refuse de répondre à la question sur la rotation des clés cryptographiques](docs/demo.png)
+La réponse s’affiche comme une page annotée : chaque phrase porte un appel de note qui mène au passage cité, placé en marge sur grand écran et sous le paragraphe sur mobile. Le reçu de recherche ferme la page. À l’ouverture, la page montre une réponse d’exemple calculée sans écrire de reçu.
+
+Pendant la frappe (à partir de 3 caractères, après 250 ms sans saisie), la marge affiche le classement FTS5 des passages candidats et indique lesquels passeraient le seuil de la réponse. Chaque note propose aussi d’écarter sa source : la recherche est relancée sans elle, la réponse change ou devient une abstention, et un bouton rétablit le corpus. L’exclusion vaut pour la requête seulement ; l’index n’est pas modifié.
+
+![Page de lecture d’Evidence Desk : la question sur un indicateur critique en échec, les candidats FTS5 en marge, la réponse avec ses appels [1] et [2] et le premier passage cité](docs/demo.png)
 
 ## Ce que l’on peut inspecter
 
@@ -88,7 +92,8 @@ Le catalogue de démonstration est dans [`data/demo/catalog.json`](data/demo/cat
 - `GET /api/documents`
 - `GET /api/receipts?limit=20`
 - `GET /api/evaluation`
-- `POST /api/query` avec `{ "question": "..." }`
+- `POST /api/query` avec `{ "question": "...", "exclude_sources": ["RUN-INC-002"] }` ; `exclude_sources` est facultatif, et `"preview": true` répond sans écrire de reçu
+- `POST /api/candidates` avec `{ "question": "..." }` (3 caractères minimum) : classement FTS5 brut, passages retenus ou non, sans reçu
 - `POST /api/ingest` avec le chemin d’un fichier déjà présent sous `data/` et des métadonnées optionnelles. Cet endpoint sert au développement local ; il ne reçoit pas de fichier uploadé et ne doit pas être exposé tel quel.
 
 ## Vérifier le projet
