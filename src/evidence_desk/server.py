@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .evaluation import evaluate, load_cases
-from .rag import answer
+from .rag import answer, candidates
 from .store import EvidenceStore
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +33,27 @@ def seed_demo() -> None:
     for path in sorted((DATA / "demo").glob("*")):
         if path.suffix.lower() in {".txt", ".md", ".html", ".htm"}:
             STORE.ingest(path, metadata=catalog.get(path.name))
+
+
+MIN_LIVE_QUESTION = 3
+
+
+def read_question(payload: dict[str, object]) -> tuple[str, frozenset[str]]:
+    """Validate the question and the sources the reader chose to set aside."""
+    raw_question = payload.get("question", "")
+    if not isinstance(raw_question, str):
+        raise ValueError("La question doit être du texte")
+    question = raw_question.strip()
+    if not question:
+        raise ValueError("Une question est requise")
+    if len(question) > 2000:
+        raise ValueError("La question est trop longue")
+    raw_excluded = payload.get("exclude_sources", [])
+    if not isinstance(raw_excluded, list) or len(raw_excluded) > 20 or not all(
+        isinstance(item, str) and 0 < len(item) <= 120 for item in raw_excluded
+    ):
+        raise ValueError("exclude_sources doit être une liste courte d’identifiants de source")
+    return question, frozenset(raw_excluded)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -85,19 +106,21 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": "Le JSON doit être un objet"}, HTTPStatus.BAD_REQUEST)
             return
         parsed = urlparse(self.path)
-        if parsed.path == "/api/query":
-            raw_question = payload.get("question", "")
-            if not isinstance(raw_question, str):
-                self.send_json({"error": "La question doit être du texte"}, HTTPStatus.BAD_REQUEST)
+        if parsed.path in {"/api/query", "/api/candidates"}:
+            try:
+                question, excluded = read_question(payload)
+            except ValueError as exc:
+                self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
                 return
-            question = raw_question.strip()
-            if not question:
-                self.send_json({"error": "Une question est requise"}, HTTPStatus.BAD_REQUEST)
+            if parsed.path == "/api/candidates":
+                if len(question) < MIN_LIVE_QUESTION:
+                    self.send_json({"error": f"Au moins {MIN_LIVE_QUESTION} caractères sont nécessaires"}, HTTPStatus.BAD_REQUEST)
+                    return
+                self.send_json(candidates(STORE, question, exclude_sources=excluded))
                 return
-            if len(question) > 2000:
-                self.send_json({"error": "La question est trop longue"}, HTTPStatus.BAD_REQUEST)
-                return
-            self.send_json(answer(STORE, question))
+            # Un exemple affiché à l'ouverture n'est pas une question du visiteur : pas de reçu écrit.
+            record = payload.get("preview") is not True
+            self.send_json(answer(STORE, question, record_receipt=record, exclude_sources=excluded))
             return
         if parsed.path == "/api/ingest":
             candidate = (ROOT / str(payload.get("path", ""))).resolve()

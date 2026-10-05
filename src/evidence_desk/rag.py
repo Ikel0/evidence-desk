@@ -38,15 +38,22 @@ def _passage_text(item: Evidence) -> str:
     return text
 
 
-def retrieve(store: EvidenceStore, question: str, limit: int = 4) -> list[Evidence]:
+def retrieve(
+    store: EvidenceStore,
+    question: str,
+    limit: int = 4,
+    exclude_sources: frozenset[str] = frozenset(),
+) -> list[Evidence]:
     """Retrieve active passages, then reject weak lexical coincidences.
 
     FTS can legitimately return a passage that shares one generic word with a
     question. A source only enters the answer path if it covers enough of the
     question and stays close to the best candidate for that query.
+    Sources set aside by the reader are removed before the floors are computed,
+    exactly as if they had been withdrawn from the corpus.
     """
     question_tokens = _tokens(question)
-    evidence = store.search(question, limit=12)
+    evidence = [item for item in store.search(question, limit=12) if item.source_id not in exclude_sources]
     scored = [
         (item, len(question_tokens & _tokens(item.text)))
         for item in evidence
@@ -217,11 +224,59 @@ def _receipt_preview(question: str, evidence: list[Evidence], *, state: str, gen
     }
 
 
-def answer(store: EvidenceStore, question: str, *, record_receipt: bool = True) -> dict[str, object]:
+def candidates(
+    store: EvidenceStore,
+    question: str,
+    *,
+    exclude_sources: frozenset[str] = frozenset(),
+    limit: int = 6,
+) -> dict[str, object]:
+    """Show the raw FTS5 ranking next to what the answer path would keep.
+
+    Nothing is written: this is the view a reader gets while typing, before
+    asking for an answer and its receipt.
+    """
+    normalized_question = question.strip()
+    question_tokens = _tokens(normalized_question)
+    found = store.search(normalized_question, limit=12)
+    kept = {item.chunk_id for item in retrieve(store, normalized_question, exclude_sources=exclude_sources)}
+    rows = []
+    for rank, item in enumerate(found[:limit], start=1):
+        excerpt = _passage_text(item)
+        rows.append(
+            {
+                "rank": rank,
+                "bm25": round(item.lexical_score, 3),
+                "overlap": len(question_tokens & _tokens(item.text)),
+                "citation": f"{item.source_id}@{item.version}#p{item.position}",
+                "source_id": item.source_id,
+                "document": item.document,
+                "status": item.status,
+                "excluded": item.source_id in exclude_sources,
+                "retained": item.chunk_id in kept,
+                "excerpt": excerpt[:140] + ("…" if len(excerpt) > 140 else ""),
+            }
+        )
+    return {
+        "query_terms": len(question_tokens),
+        "fts_matches": len(found),
+        "candidates": rows,
+        "would_abstain": not kept,
+    }
+
+
+def answer(
+    store: EvidenceStore,
+    question: str,
+    *,
+    record_receipt: bool = True,
+    exclude_sources: frozenset[str] = frozenset(),
+) -> dict[str, object]:
     """Return cited passages or a deliberate refusal when no evidence was found."""
     normalized_question = question.strip()
-    evidence = retrieve(store, normalized_question)
+    evidence = retrieve(store, normalized_question, exclude_sources=exclude_sources)
     retrieval = _retrieval_summary(normalized_question, evidence)
+    retrieval["excluded_sources"] = sorted(exclude_sources)
     if not evidence:
         receipt_args = {
             "response_state": "insufficient_evidence",
